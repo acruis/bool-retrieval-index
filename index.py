@@ -11,11 +11,13 @@ except:
 	import pickle
 
 def loadAllDocNames(docs_dir):
-	joined_contents = [(f, join(docs_dir, f)) for f in listdir(docs_dir)]
-	joined_files = [(f, joined_f) for f, joined_f in joined_contents if isfile(joined_f)]
+	sorted_members = sorted([int(dir_member) for dir_member in listdir(docs_dir)])
+	# Additional check for only files in directory
+	joined_members = [(dir_member, join(docs_dir, str(dir_member))) for dir_member in sorted_members]
+	joined_files = [(member_name, member_path) for member_name, member_path in joined_members if isfile(member_path)]
 	return joined_files
 
-def updatePostings(doc_name, postings):
+def indexDoc(doc_name, postings):
 	docID, doc_path = doc_name
 	doc = file(doc_path).read()
 	sentences = nltk.tokenize.sent_tokenize(doc)
@@ -25,6 +27,12 @@ def updatePostings(doc_name, postings):
 			postings[word].append(docID)
 		else:
 			postings[word] = [docID]
+
+def indexAllDocs(docs):
+	postings = {}
+	for doc in docs[:10]:
+		indexDoc(doc, postings)
+	return postings
 
 def usage():
 	print "usage: " + sys.argv[0] + " -i directory-of-documents -d dictionary-file -p postings-file"
@@ -52,7 +60,4 @@ print docs_dir
 print dict_file
 print postings_file
 docs = loadAllDocNames(docs_dir)
-print docs[998]
-postings = {}
-updatePostings(docs[998], postings)
-print postings
+postings = indexAllDocs(docs)
