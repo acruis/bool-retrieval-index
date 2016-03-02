@@ -5,6 +5,11 @@ after indexing => dictionary-file (literal_eval, tuple of list and dict) posting
 IN: file-of-queries, one query occupies one line
 OUT: output-file-of-results
 
+# LITERAL EVALUATION
+import ast
+x = ast.literal_eval("[1,2]")
+The value of x becomes [1,2] (as a list)
+
 # OUTPUT
 answer to a query should contain a list of document IDs that match the query in increasing order, in one line
 if not found => empty line
