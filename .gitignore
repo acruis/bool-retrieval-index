@@ -1,1 +1,4 @@
 corpus/
+
+# Mac
+.DS_Store
