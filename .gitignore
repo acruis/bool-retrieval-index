@@ -1,4 +1,5 @@
 corpus/
+.idea/
 
 # Mac
 .DS_Store
