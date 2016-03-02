@@ -1,27 +1,30 @@
-#$ python search.py -d dictionary-file -p postings-file -q file-of-queries -o output-file-of-results
-# after indexing => dictionary-file (not pickled, space delimited numbers) postings-file (literal_eval)
-# IN: file-of-queries, one query occupies one line
-# OUT: output-file-of-results
-
-# answer to a query should contain a list of document IDs that match the query in increasing order, in one line
-# if not found => empty line
-# document IDs should follow the filenames
-# Reuters doc IDs are unique integers, they are not necessary sequential
-
-# should not read whole postings file into RAM
-# use pointers in dictionary to load postings lists from postings file
-# seek read
-
 """
-0 NOTs
+# FILES
+$ python search.py -d dictionary-file -p postings-file -q file-of-queries -o output-file-of-results
+after indexing => dictionary-file (literal_eval, tuple of list and dict) postings-file (space delimited numbers)
+IN: file-of-queries, one query occupies one line
+OUT: output-file-of-results
+
+# OUTPUT
+answer to a query should contain a list of document IDs that match the query in increasing order, in one line
+if not found => empty line
+document IDs should follow the filenames
+Reuters doc IDs are unique integers, they are not necessary sequential
+
+# READING
+should not read whole postings file into RAM
+use pointers in dictionary to load postings lists from postings file
+seek read
+
+# 0 NOTs
 AND
 OR
 
-1 NOT
+# 1 NOT
 a AND NOT b => copy a, but avoid b
 a OR NOT b => a OR (docs - b)
 
-De morgan's, 2 NOTs
+# De morgan's, 2 NOTs
 (NOT a) AND (NOT b) => NOT(a OR b)
 (NOT a) OR (NOT b) => NOT(a AND b)
 """
@@ -39,7 +42,8 @@ def magic(queries_file, out_file):
 # queries: ( ) NOT AND OR, in decreasing order of precedence
 # single words conjoined with boolean ops in CAPS
 # no nested parantheses
-def shunting(query):
+# returns a stack in Reverse Polish Notation
+def shunting_yard(query):
     query_tokens = nltk.word_tokenize(query)
     rpn_stack = []
     op_stack = []
@@ -73,7 +77,7 @@ def precedence(op):
         "OR": 0,
         "AND": 1,
         "NOT": 2,
-        "(" : -1,
+        "(" : -1, # never executed as an operation
         }[op]
 
 def usage():
