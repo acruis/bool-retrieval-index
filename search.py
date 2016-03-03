@@ -109,8 +109,7 @@ class OpNode:
             term_pointer = dictionary[self.term][0]
             postings_length = dictionary[self.term][1]
             postings_file.seek(term_pointer)
-            self.postings = postings_file.read(postings_length).split()
-            self.expected_postings = len(self.postings)
+            self.postings = [int(docID) for docID in postings_file.read(postings_length).split()]
 
     def merge(children_postings):
         if op == "NOT":
@@ -130,6 +129,33 @@ class OpNode:
         else:
             return self.postings
 
+    def consolidate_ops_recursive(self, required_op):
+        if self.op != required_op:
+            return [self]
+        else:
+            grouped_children = []
+            for child in self.children:
+                grouped_children.extend(child.consolidate_ops_recursive(required_op))
+            return grouped_children
+
+    def consolidate_not_recursive(self, effective):
+        if self.op != "NOT":
+            return (self, effective)
+        else:
+            return self.children[0].consolidate_not_recursive(not effective)
+
+    def consolidate_ops(self):
+        if self.op == None:
+            self.expected_postings = len(self.postings)
+        elif self.op == "AND":
+            self.children = self.consolidate_ops_recursive("AND")
+        elif self.op == "OR":
+            self.children = self.consolidate_ops_recursive("OR")
+        elif self.op == "NOT":
+            child, effective = self.consolidate_not_recursive(False)
+            if effective:
+                self.children = [child]
+
 class OpTree:
     root = None
     op_list = ["NOT", "AND", "OR"]
@@ -146,7 +172,7 @@ class OpTree:
                 else:
                     # For a NOT, only child is always on the left
                     only_child = node_stack.pop()
-                    node_stack.append(OpNode([child], None, token, None))
+                    node_stack.append(OpNode([child], token, None))
             else:
                 token_node = OpNode(None, None, token)
                 # token_node.read_postings_of_term(postings_file, dictionary)
@@ -178,6 +204,8 @@ if __name__ == "__main__":
         usage()
         sys.exit(2)
 
+    '''
+    # tree initialization
     tree = OpTree(['bill', 'gates', 'AND', 'steve', 'jobs', 'AND', 'AND'], None, None)
     print "--- How tree looks like ---"
     root = tree.root
@@ -188,3 +216,22 @@ if __name__ == "__main__":
     print root.children[1].children[0].term,
     print root.children[1].op,
     print root.children[1].children[1].term
+    '''
+
+    '''
+    # nots
+    yes = OpNode(None, None, "Hi!")
+    no = OpNode([yes], "NOT", None)
+    yes1 = OpNode([no], "NOT", None)
+    no1 = OpNode([yes1], "NOT", None)
+    yes2 = OpNode([no1], "NOT", None)
+    no2 = OpNode([yes2], "NOT", None)
+    no2.consolidate_ops()
+    print no2.children[0].term
+    '''
+
+    tree = OpTree(['bill', 'gates', 'AND', 'steve', 'jobs', 'AND', 'AND'], None, None)
+    tree.root.consolidate_ops()
+    print len(tree.root.children)
+    for child in tree.root.children:
+        print child.term
