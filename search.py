@@ -92,14 +92,12 @@ def usage():
 class OpNode:
     op = None # "NOT", "AND" or "OR"
     term = None
-    left_child = None
-    right_child = None
+    children = None
     postings = []
     expected_postings = 0
 
-    def __init__(self, left, right, op, term):
-        self.left_child = left
-        self.right_child = right
+    def __init__(self, children, op, term):
+        self.children = children
         self.op = op
         self.term = term
 
@@ -114,6 +112,24 @@ class OpNode:
             self.postings = postings_file.read(postings_length).split()
             self.expected_postings = len(self.postings)
 
+    def merge(children_postings):
+        if op == "NOT":
+            # return not(children_postings[0], all_docIDs)
+            pass
+        elif op == "OR":
+            # return or(children_postings)
+            pass
+        elif op == "AND":
+            # return and(children_postings)
+            pass
+
+    def recursive_merge(self):
+        if self.op != None:
+            children_postings = [child.recursive_merge for child in children]
+            return self.merge(children_postings)
+        else:
+            return self.postings
+
 class OpTree:
     root = None
     op_list = ["NOT", "AND", "OR"]
@@ -123,11 +139,16 @@ class OpTree:
         print "--- Nodes ---"
         for token in rpn_stack:
             if token in self.op_list:
-                right_child = node_stack.pop()
-                left_child = node_stack.pop()
-                node_stack.append(OpNode(left_child, right_child, token, None))
+                if token != "NOT":
+                    right_child = node_stack.pop()
+                    left_child = node_stack.pop()
+                    node_stack.append(OpNode([left_child, right_child], token, None))
+                else:
+                    # For a NOT, only child is always on the left
+                    only_child = node_stack.pop()
+                    node_stack.append(OpNode([child], None, token, None))
             else:
-                token_node = OpNode(None, None, None, token)
+                token_node = OpNode(None, None, token)
                 # token_node.read_postings_of_term(postings_file, dictionary)
                 node_stack.append(token_node)
             print [(node.op, node.term) for node in node_stack]
@@ -160,10 +181,10 @@ if __name__ == "__main__":
     tree = OpTree(['bill', 'gates', 'AND', 'steve', 'jobs', 'AND', 'AND'], None, None)
     print "--- How tree looks like ---"
     root = tree.root
-    print root.left_child.left_child.term,
-    print root.left_child.op,
-    print root.left_child.right_child.term,
+    print root.children[0].children[0].term,
+    print root.children[0].op,
+    print root.children[0].children[1].term,
     print root.op,
-    print root.right_child.left_child.term,
-    print root.right_child.op,
-    print root.right_child.right_child.term
+    print root.children[1].children[0].term,
+    print root.children[1].op,
+    print root.children[1].children[1].term
