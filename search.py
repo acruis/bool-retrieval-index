@@ -1,22 +1,3 @@
-"""
-# FILES
-$ python search.py -d dictionary-file -p postings-file -q file-of-queries -o output-file-of-results
-
-# OUTPUT
-if not found => empty line
-
-# READING
-seek read
-
-# 1 NOT
-a AND NOT b => copy a, but avoid b
-a OR NOT b => a OR (docs - b)
-
-# De morgan's, 2 NOTs
-(NOT a) AND (NOT b) => NOT(a OR b)
-(NOT a) OR (NOT b) => NOT(a AND b)
-"""
-
 import re
 import nltk
 import sys
@@ -247,7 +228,7 @@ class OpNode:
 
     def deMorgans(self, children_nots):
         children_of_nots = [child_not.children[0] for child_not in children_nots]
-        center_grandchild = OpNode(children_of_nots, self.op == "AND" ? "OR" : "AND", None)
+        center_grandchild = OpNode(children_of_nots, "OR" if self.op == "AND" else "AND", None)
         new_child_not = OpNode([center_grandchild], "NOT", None)
         self.children.append(new_child_not)
 
