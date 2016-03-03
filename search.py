@@ -90,6 +90,26 @@ def op_and(p1, p2):
     return result
 
 
+def op_and_not(p1, p2):
+    result = []
+    i = 0
+    j = 0
+
+    while i < len(p1) and j < len(p2):
+        if p1[i] == p2[j]:
+            i += 1
+            j += 1
+        elif p1[i] < p2[j]:
+            result.append(p1[i])
+            i += 1
+        else:
+            j += 1
+
+    result.extend(p1[i:])
+
+    return result
+
+
 def op_or(p1, p2):
     result = []
     i = 0
