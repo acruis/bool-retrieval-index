@@ -90,6 +90,16 @@ def op_and(p1, p2):
     return result
 
 
+def op_multi_and(list_of_postings_lists):
+    list_of_postings_lists.sort(key=len)
+    result = list_of_postings_lists[0]
+
+    for p in list_of_postings_lists[1:]:
+        result = op_and(result, p)
+
+    return result
+
+
 def op_and_not(p1, p2):
     result = []
     i = 0
