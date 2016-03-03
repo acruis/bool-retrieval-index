@@ -107,11 +107,12 @@ class OpNode:
         return self.op != None
 
     def read_postings_of_term(self, postings_file, dictionary):
-        term_pointer = dictionary[self.term][0]
-        postings_length = dictionary[self.term][1]
-        postings_file.seek(term_pointer)
-        self.postings = postings_file.read(postings_length).split()
-        self.expected_postings = len(self.postings)
+        if self.term in dictionary:
+            term_pointer = dictionary[self.term][0]
+            postings_length = dictionary[self.term][1]
+            postings_file.seek(term_pointer)
+            self.postings = postings_file.read(postings_length).split()
+            self.expected_postings = len(self.postings)
 
 class OpTree:
     root = None
