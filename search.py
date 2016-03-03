@@ -3,6 +3,7 @@ import nltk
 import sys
 import getopt
 import json
+import heapq
 
 def magic(queries_file, out_file):
     with open(queries_file) as queries_data, open(out_file, 'w+') as results_data:
@@ -126,6 +127,19 @@ def op_or(p1, p2):
     return result
 
 
+def op_multi_or(list_of_postings_lists):
+    heap = []
+    results = []
+    for postings in list_of_postings_lists:
+        for docID in postings:
+            heapq.heappush(heap, docID)
+
+    while heap:
+        smallest = heapq.heappop(heap)
+        if results and results[-1] != smallest: results.append(smallest)
+
+    return results
+
 def op_not(p, all_p):
     result = []
     i = 0
@@ -175,7 +189,7 @@ class OpNode:
         if self.op == "NOT":
             return op_not(children_postings[0], all_docIDs)
         elif self.op == "OR":
-            return op_or(children_postings[0], children_postings[1])
+            return op_multi_or(children_postings)
         elif self.op == "AND":
             return op_multi_and(children_postings)
         elif self.op == "AND NOT":
