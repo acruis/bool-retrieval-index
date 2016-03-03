@@ -77,7 +77,7 @@ def op_and(p1, p2):
     i = 0
     j = 0
 
-    while i < len(p1) and i < len(p2):
+    while i < len(p1) and j < len(p2):
         if p1[i] == p2[j]:
             result.append(p1[i])
             i += 1
@@ -95,7 +95,7 @@ def op_or(p1, p2):
     i = 0
     j = 0
 
-    while i < len(p1) and i < len(p2):
+    while i < len(p1) and j < len(p2):
         if p1[i] == p2[j]:
             result.append(p1[i])
             i += 1
@@ -120,7 +120,7 @@ def op_not(p, all_p):
     i = 0
     j = 0
 
-    while i < len(p) and i < len(all_p):
+    while i < len(p) and j < len(all_p):
         if p[i] == all_p[j]:
             i += 1
             j += 1
