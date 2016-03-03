@@ -5,6 +5,7 @@ fund
 city OR bank OR fund
 supply
 city OR bank OR fund OR supply
+money
 
 money AND NOT (city OR bank OR fund OR supply OR trust OR exchange)
 money AND NOT (city OR bank OR fund OR supply OR trust OR exchange OR trade)

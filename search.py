@@ -6,191 +6,6 @@ import json
 import heapq
 
 
-# Here be Dats!
-class OpTree:
-    """Models a Reverse Polish Notation search query with a tree.
-
-    """
-
-    root = None
-    op_list = ["NOT", "AND", "OR"]
-
-    def __init__(self, rpn_stack, postings_file, dictionary):
-        node_stack = []
-        print "--- Nodes ---"
-        for token in rpn_stack:
-            if token in self.op_list:
-                if token != "NOT":
-                    right_child = node_stack.pop()
-                    left_child = node_stack.pop()
-                    node_stack.append(OpNode([left_child, right_child], token, None))
-                else:
-                    # For a NOT, only child is always on the left
-                    only_child = node_stack.pop()
-                    node_stack.append(OpNode([only_child], token, None))
-            else:
-                token_node = OpNode(None, None, token)
-                token_node.read_postings_of_term(postings_file, dictionary)
-                node_stack.append(token_node)
-            print [(node.op, node.term) for node in node_stack]
-        self.root = node_stack.pop()
-
-
-class OpNode:
-    """Nodes for tree used to model a search query in Reverse Polish Notation.
-
-    A node may represent either a search token or an operator.
-
-    Attributes:
-        children: A list of OpNode instances. Only operator nodes have children.
-        op: A string indicating the node's operator type..
-            Possible values: "NOT", "AND", "OR", "AND NOT", None
-        term: A string containing the search token value.
-        postings: An integer list storing the docIDs from the postings list of a search token node.
-        expected_count: An integer storing the expected number of docIDs after an operator node has been fully resolved.
-    """
-
-    children = None
-    op = None
-    term = None
-    postings = []
-    expected_count = 0
-
-    def __init__(self, children, op, term):
-        """Inits OpNode with a list of its child nodes, its operator type, and its search token, where applicable.
-
-        Only operator nodes should have children, and has an operator type: "NOT", "AND", "OR", "AND NOT".
-        Only search token nodes have a search token value, and has an operator type: None.
-
-        :param children: A list of OpNode instances. Only operator nodes have children.
-        :param op: A string indicating the node's operator type. Possible values: "NOT", "AND", "OR", "AND NOT", None
-        :param term: A string containing the search token value
-        """
-
-        self.children = children
-        self.op = op
-        self.term = term
-
-    def is_op(self):
-        """Boolean check if node is a type of operator.
-
-        :return:A boolean value. True if operator. False if search token node.
-        """
-        return self.op != None
-
-    def read_postings_of_term(self, postings_file, dictionary):
-        """ Gets own postings list for search token node.
-
-        :param postings_file:
-        :param dictionary:
-        :return:
-        """
-        if self.term in dictionary:
-            term_pointer = dictionary[self.term][0]
-            postings_length = dictionary[self.term][1]
-            postings_file.seek(term_pointer)
-            self.postings = [int(docID) for docID in postings_file.read(postings_length).split()]
-
-    def merge(self, children_postings, all_docIDs):
-        if self.op == "NOT":
-            return op_not(children_postings[0], all_docIDs)
-        elif self.op == "OR":
-            return op_multi_or(children_postings)
-        elif self.op == "AND":
-            return op_multi_and(children_postings)
-        elif self.op == "AND NOT":
-            return op_and_not(children_postings[0], children_postings[1])
-
-    def recursive_merge(self, all_docIDs):
-        if self.op != None:
-            children_postings = [child.recursive_merge(all_docIDs) for child in self.children]
-            return self.merge(children_postings, all_docIDs)
-        else:
-            return self.postings
-
-    def consolidate_ops_recursive(self, required_op):
-        if self.op != required_op:
-            return [self]
-        else:
-            grouped_children = []
-            for child in self.children:
-                grouped_children.extend(child.consolidate_ops_recursive(required_op))
-            return grouped_children
-
-    def consolidate_not_recursive(self, effective):
-        if self.op != "NOT":
-            return (self, effective)
-        else:
-            return self.children[0].consolidate_not_recursive(not effective)
-
-    def consolidate_ops(self):
-        if self.op == "AND":
-            self.children = self.consolidate_ops_recursive("AND")
-        elif self.op == "OR":
-            self.children = self.consolidate_ops_recursive("OR")
-        elif self.op == "NOT":
-            descendant, effective = self.consolidate_not_recursive(False)
-            if effective:
-                self.children = [descendant]
-            else:
-                self.copy_descendant_info(descendant)
-
-        if self.op != None:
-            for child in self.children:
-                child.consolidate_ops()
-
-    def copy_descendant_info(self, descendant):
-        self.op = descendant.op
-        self.term = descendant.term
-        self.expected_count = descendant.expected_count
-        self.children = descendant.children
-        self.postings = descendant.postings
-
-    def deMorgans(self, children_nots):
-        children_of_nots = [child_not.children[0] for child_not in children_nots]
-        center_grandchild = OpNode(children_of_nots, "OR" if self.op == "AND" else "AND", None)
-        new_child_not = OpNode([center_grandchild], "NOT", None)
-        self.children.append(new_child_not)
-
-    def process_and_not(self, child_not, children_notnots):
-        new_child_and = OpNode([children_notnots], "AND", None)
-        self.op = "AND NOT"
-        self.children = [new_child_and, child_not.children[0]]
-
-    def consolidate_children(self):
-        if self.children:
-            if self.op == "OR" or self.op == "AND":
-                children_nots = [child for child in self.children if child.op == "NOT"]
-                self.children = [child for child in self.children if child.op != "NOT"]
-                if len(children_nots) > 1:
-                    self.deMorgans(children_nots)
-            if self.op == "AND":
-                children_nots = [child for child in self.children if child.op == "NOT"]
-                children_notnots = [child for child in self.children if child.op != "NOT"]
-                if children_nots:
-                    assert(len(children_nots) == 1)
-                    self.process_and_not(children_nots[0], children_notnots)
-            for child in self.children:
-                child.consolidate_children()
-
-    def calculate_expected(self, all_docIDs):
-        if self.op == None:
-            self.expected_count = len(self.postings)
-        elif self.op == "AND":
-            for child in self.children: child.calculate_expected(all_docIDs)
-            self.expected_count = min([child.expected_count for child in self.children])
-        elif self.op == "OR":
-            for child in self.children: child.calculate_expected(all_docIDs)
-            self.expected_count = sum([child.expected_count for child in self.children])
-        elif self.op == "NOT":
-            self.children[0].calculate_expected(all_docIDs)
-            self.expected_count = len(all_docIDs) - self.children[0].expected_count
-        elif self.op == "AND NOT":
-            self.children[0].calculate_expected(all_docIDs)
-            self.expected_count = self.children[0].expected_count
-# Dat end tho
-
-
 # For shunting_yard's use only
 def precedence(op):
     return {
@@ -316,7 +131,10 @@ def op_multi_or(list_of_postings_lists):
 
     while heap:
         smallest = heapq.heappop(heap)
-        if results and results[-1] != smallest: results.append(smallest)
+        if results:
+            if results[-1] != smallest: results.append(smallest)
+        else:
+            results.append(smallest)
 
     return results
 
@@ -342,6 +160,186 @@ def op_not(p, all_p):
 
 def usage():
     print "usage: " + sys.argv[0] + " -d dictionary-file -p postings-file -q file-of-queries -o output-file-of-results"
+
+
+# Here be Dats!
+class OpNode:
+    """Nodes for tree used to model a search query in Reverse Polish Notation.
+
+    A node may represent either a search token or an operator.
+
+    Attributes:
+        children: A list of OpNode instances. Only operator nodes have children.
+        op: A string indicating the node's operator type..
+            Possible values: "NOT", "AND", "OR", "AND NOT", None
+        term: A string containing the search token value.
+        postings: An integer list storing the docIDs from the postings list of a search token node.
+        expected_count: An integer storing the expected number of docIDs after an operator node has been fully resolved.
+    """
+
+    children = None
+    op = None
+    term = None
+    postings = []
+    expected_count = 0
+
+    def __init__(self, children, op, term):
+        """Inits OpNode with a list of its child nodes, its operator type, and its search token, where applicable.
+
+        Only operator nodes should have children, and has an operator type: "NOT", "AND", "OR", "AND NOT".
+        Only search token nodes have a search token value, and has an operator type: None.
+
+        :param children: A list of OpNode instances. Only operator nodes have children.
+        :param op: A string indicating the node's operator type. Possible values: "NOT", "AND", "OR", "AND NOT", None
+        :param term: A string containing the search token value
+        """
+
+        self.children = children
+        self.op = op
+        self.term = term
+
+    def is_op(self):
+        """Boolean check if node is a type of operator.
+
+        :return:A boolean value. True if operator. False if search token node.
+        """
+        return self.op != None
+
+    def read_postings_of_term(self, postings_file, dictionary):
+        """ Gets own postings list for search token node.
+
+        :param postings_file:
+        :param dictionary:
+        :return:
+        """
+        if self.term in dictionary:
+            term_pointer = dictionary[self.term][0]
+            postings_length = dictionary[self.term][1]
+            postings_file.seek(term_pointer)
+            self.postings = [int(docID) for docID in postings_file.read(postings_length).split()]
+
+    def merge(self, children_postings, all_docIDs):
+        if self.op == "NOT":
+            return op_not(children_postings[0], all_docIDs)
+        elif self.op == "OR":
+            return op_multi_or(children_postings)
+        elif self.op == "AND":
+            return op_multi_and(children_postings)
+        elif self.op == "AND NOT":
+            return op_and_not(children_postings[0], children_postings[1])
+
+    def recursive_merge(self, all_docIDs):
+        if self.op != None:
+            children_postings = [child.recursive_merge(all_docIDs) for child in self.children]
+            return self.merge(children_postings, all_docIDs)
+        else:
+            return self.postings
+
+    def consolidate_ops_recursive(self, required_op):
+        if self.op != required_op:
+            return [self]
+        else:
+            grouped_children = []
+            for child in self.children:
+                grouped_children.extend(child.consolidate_ops_recursive(required_op))
+            return grouped_children
+
+    def consolidate_not_recursive(self, effective):
+        if self.op != "NOT":
+            return (self, effective)
+        else:
+            return self.children[0].consolidate_not_recursive(not effective)
+
+    def consolidate_ops(self):
+        if self.op == "AND":
+            self.children = self.consolidate_ops_recursive("AND")
+        elif self.op == "OR":
+            self.children = self.consolidate_ops_recursive("OR")
+        elif self.op == "NOT":
+            descendant, effective = self.consolidate_not_recursive(False)
+            if effective:
+                self.children = [descendant]
+            else:
+                self.copy_descendant_info(descendant)
+        
+        if self.op != None:
+            for child in self.children:
+                child.consolidate_ops()
+
+    def copy_descendant_info(self, descendant):
+        self.op = descendant.op
+        self.term = descendant.term
+        self.expected_count = descendant.expected_count
+        self.children = descendant.children
+        self.postings = descendant.postings
+
+    def de_morgans(self, children_nots):
+        children_of_nots = [child_not.children[0] for child_not in children_nots]
+        center_grandchild = OpNode(children_of_nots, "OR" if self.op == "AND" else "AND", None)
+        new_child_not = OpNode([center_grandchild], "NOT", None)
+        self.children.append(new_child_not)
+
+    def process_and_not(self, child_not, children_notnots):
+        new_child_and = OpNode(children_notnots, "AND", None)
+        self.op = "AND NOT"
+        self.children = [new_child_and, child_not.children[0]]
+
+    def consolidate_children(self):
+        if self.children:
+            if self.op == "OR" or self.op == "AND":
+                children_nots = [child for child in self.children if child.op == "NOT"]
+                if len(children_nots) > 1:
+                    self.children = [child for child in self.children if child.op != "NOT"]
+                    self.de_morgans(children_nots)
+            if self.op == "AND":
+                children_nots = [child for child in self.children if child.op == "NOT"]
+                children_notnots = [child for child in self.children if child.op != "NOT"]
+                if children_nots:
+                    assert(len(children_nots) == 1)
+                    self.process_and_not(children_nots[0], children_notnots)
+            for child in self.children:
+                child.consolidate_children()
+
+    def calculate_expected(self, all_docIDs):
+        if self.op == None:
+            self.expected_count = len(self.postings)
+        elif self.op == "AND":
+            for child in self.children: child.calculate_expected(all_docIDs)
+            self.expected_count = min([child.expected_count for child in self.children])
+        elif self.op == "OR":
+            for child in self.children: child.calculate_expected(all_docIDs)
+            self.expected_count = sum([child.expected_count for child in self.children])
+        elif self.op == "NOT":
+            self.children[0].calculate_expected(all_docIDs)
+            self.expected_count = len(all_docIDs) - self.children[0].expected_count
+
+class OpTree:
+    """Models a Reverse Polish Notation search query with a tree.
+
+    """
+    root = None
+    op_list = ["NOT", "AND", "OR"]
+
+    def __init__(self, rpn_stack, postings_file, dictionary):
+        node_stack = []
+        print "--- Nodes ---"
+        for token in rpn_stack:
+            if token in self.op_list:
+                if token != "NOT":
+                    right_child = node_stack.pop()
+                    left_child = node_stack.pop()
+                    node_stack.append(OpNode([left_child, right_child], token, None))
+                else:
+                    # For a NOT, only child is always on the left
+                    only_child = node_stack.pop()
+                    node_stack.append(OpNode([only_child], token, None))
+            else:
+                token_node = OpNode(None, None, token)
+                token_node.read_postings_of_term(postings_file, dictionary)
+                node_stack.append(token_node)
+            print [(node.op, node.term) for node in node_stack]
+        self.root = node_stack.pop()
+# Dat end tho
 
 
 def tree_initialization_test():
@@ -408,7 +406,11 @@ def process_queries(dictionary_file, postings_file, queries_file, output_file):
     output = file(output_file, 'w')
     with open(queries_file) as queries:
         for query in queries:
+            output.write("one\n")
+            output.write(query)
             rpn_stack = shunting_yard(query)
+            output.write(repr(rpn_stack))
+            output.write("\n")
             if rpn_stack:
                 tree = OpTree(rpn_stack, postings, dictionary)
                 tree.root.consolidate_ops()
@@ -422,12 +424,21 @@ def process_queries(dictionary_file, postings_file, queries_file, output_file):
     postings.close()
     output.close()
 
+def and_not_test():
+    tree = OpTree(shunting_yard("money AND NOT possibility"), None, {})
+    print (tree.root.children[0].op, tree.root.children[0].term)
+    print (tree.root.children[1].op, tree.root.children[1].term)
+    print (tree.root.children[1].children[0].op, tree.root.children[1].children[0].term)
+    tree.root.consolidate_children()
+    print tree.root.op
+
 def main():
     dictionary_file, postings_file, queries_file, output_file = load_args()
 
     # tree_initialization_test()
     # nots_test()
     # consolidate_test()
+    # and_not_test()
     process_queries(dictionary_file, postings_file, queries_file, output_file)
 
 if __name__ == "__main__":
