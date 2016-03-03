@@ -4,7 +4,7 @@ import sys
 import getopt
 import json
 import heapq
-
+import time
 
 # For shunting_yard's use only
 def precedence(op):
@@ -277,7 +277,7 @@ class OpNode:
         children_of_nots = [child_not.children[0] for child_not in children_nots]
         center_grandchild = OpNode(children_of_nots, "OR" if self.op == "AND" else "AND", None)
         new_child_not = OpNode([center_grandchild], "NOT", None)
-        self.children.append(new_child_not)
+        return new_child_not
 
     def process_and_not(self, child_not, children_notnots):
         new_child_and = OpNode(children_notnots, "AND", None)
@@ -289,12 +289,15 @@ class OpNode:
             if self.op == "OR" or self.op == "AND":
                 children_nots = [child for child in self.children if child.op == "NOT"]
                 if len(children_nots) > 1:
-                    self.children = [child for child in self.children if child.op != "NOT"]
-                    self.de_morgans(children_nots)
+                    if len(children_nots) == len(self.children): # de Morgan's completely wipes out children, so morph into NOT node
+                        self.copy_descendant_info(self.de_morgans(children_nots))
+                    else: # There are non-NOT children, so maintain current op in current node
+                        self.children = [child for child in self.children if child.op != "NOT"]
+                        self.children.append(self.de_morgans(children_nots))
             if self.op == "AND":
                 children_nots = [child for child in self.children if child.op == "NOT"]
                 children_notnots = [child for child in self.children if child.op != "NOT"]
-                if children_nots:
+                if children_nots: # There are non-NOT children, and a single NOT child (de Morgan's prevents more NOTs), so morph into AND NOT
                     assert(len(children_nots) == 1)
                     self.process_and_not(children_nots[0], children_notnots)
             for child in self.children:
@@ -322,7 +325,7 @@ class OpTree:
 
     def __init__(self, rpn_stack, postings_file, dictionary):
         node_stack = []
-        print "--- Nodes ---"
+        # print "--- Nodes ---"
         for token in rpn_stack:
             if token in self.op_list:
                 if token != "NOT":
@@ -337,7 +340,7 @@ class OpTree:
                 token_node = OpNode(None, None, token)
                 token_node.read_postings_of_term(postings_file, dictionary)
                 node_stack.append(token_node)
-            print [(node.op, node.term) for node in node_stack]
+            # print [(node.op, node.term) for node in node_stack]
         self.root = node_stack.pop()
 # Dat end tho
 
@@ -398,6 +401,7 @@ def load_args():
 
 def process_queries(dictionary_file, postings_file, queries_file, output_file):
     # load dictionary
+    begin = time.time() * 1000.0
     with open(dictionary_file) as dict_file:
         all_docIDs, dictionary = json.load(dict_file)
 
@@ -406,11 +410,11 @@ def process_queries(dictionary_file, postings_file, queries_file, output_file):
     output = file(output_file, 'w')
     with open(queries_file) as queries:
         for query in queries:
-            output.write("one\n")
-            output.write(query)
+            # output.write("one\n")
+            # output.write(query)
             rpn_stack = shunting_yard(query)
-            output.write(repr(rpn_stack))
-            output.write("\n")
+            # output.write(repr(rpn_stack))
+            # output.write("\n")
             if rpn_stack:
                 tree = OpTree(rpn_stack, postings, dictionary)
                 tree.root.consolidate_ops()
@@ -423,6 +427,8 @@ def process_queries(dictionary_file, postings_file, queries_file, output_file):
                 output.write("\n")
     postings.close()
     output.close()
+    after = time.time() * 1000.0
+    print after-begin
 
 def and_not_test():
     tree = OpTree(shunting_yard("money AND NOT possibility"), None, {})
