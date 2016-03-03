@@ -59,6 +59,10 @@ def shunting_yard(query):
     return rpn_stack
 
 
+def peek(lst):
+    return lst[-1]
+
+
 def precedence(op):
     return {
         "OR": 0,
@@ -165,7 +169,7 @@ class OpNode:
             return self.merge(children_postings)
         else:
             return self.postings
-        
+
 
 class OpTree:
     root = None
