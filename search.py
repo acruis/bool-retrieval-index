@@ -196,26 +196,61 @@ class OpNode:
         elif self.op == "OR":
             self.children = self.consolidate_ops_recursive("OR")
         elif self.op == "NOT":
-            child, effective = self.consolidate_not_recursive(False)
+            descendant, effective = self.consolidate_not_recursive(False)
             if effective:
-                self.children = [child]
-        elif self.op == None:
-            return
+                self.children = [descendant]
+            else:
+                self.copy_descendant_info(descendant)
+        
+        if self.op != None:
+            for child in self.children:
+                child.consolidate_ops()
 
-        for child in self.children:
-            child.consolidate_ops()
+    def copy_descendant_info(self, descendant):
+        self.op = descendant.op
+        self.term = descendant.term
+        self.expected_count = descendant.expected_count
+        self.children = descendant.children
+        self.postings = descendant.postings
 
-    def calculate_expected(self):
+    def deMorgans(self, children_nots):
+        children_of_nots = [child_not.children[0] for child_not in children_nots]
+        center_grandchild = OpNode(children_of_nots, self.op == "AND" ? "OR" : "AND", None)
+        new_child_not = OpNode([center_grandchild], "NOT", None)
+        self.children.append(new_child_not)
+
+    def process_and_not(self, child_not, children_notnots):
+        new_child_and = OpNode([children_notnots], "AND", None)
+        self.op = "AND NOT"
+        self.children = [new_child_and, child_not.children[0]]
+
+    def consolidate_children(self):
+        if self.children:
+            if self.op == "OR" or self.op == "AND":
+                children_nots = [child_not for child in self.children if child.op == "NOT"]
+                self.children = [child_notnot for child in self.children if child.op != "NOT"]
+                if len(children_nots) > 1:
+                    self.deMorgans(children_nots)
+            if self.op == "AND":
+                children_nots = [child_not for child in self.children if child.op == "NOT"]
+                children_notnots = [child_notnot for child in self.children if child.op != "NOT"]
+                if children_nots:
+                    assert(len(children_nots) == 1)
+                    processAndNot(children_not[0], children_notnots)
+            for child in self.children:
+                child.consolidate_children()
+
+    def calculate_expected(self, all_docIDs):
         if self.op == None:
             self.expected_count = len(self.postings)
         elif self.op == "AND":
-            for child in self.children: child.calculate_expected()
+            for child in self.children: child.calculate_expected(all_docIDs)
             self.expected_count = min([child.expected_count for child in self.children])
         elif self.op == "OR":
-            for child in self.children: child.calculate_expected()
+            for child in self.children: child.calculate_expected(all_docIDs)
             self.expected_count = sum([child.expected_count for child in self.children])
         elif self.op == "NOT":
-            self.children[0].calculate_expected()
+            self.children[0].calculate_expected(all_docIDs)
             self.expected_count = len(all_docIDs) - self.children[0].expected_count
 
 class OpTree:
@@ -234,7 +269,7 @@ class OpTree:
                 else:
                     # For a NOT, only child is always on the left
                     only_child = node_stack.pop()
-                    node_stack.append(OpNode([child], token, None))
+                    node_stack.append(OpNode([only_child], token, None))
             else:
                 token_node = OpNode(None, None, token)
                 token_node.read_postings_of_term(postings_file, dictionary)
@@ -262,8 +297,9 @@ def nots_test():
     no1 = OpNode([yes1], "NOT", None)
     yes2 = OpNode([no1], "NOT", None)
     no2 = OpNode([yes2], "NOT", None)
-    no2.consolidate_ops()
-    print no2.children[0].term
+    yes3 = OpNode([no2], "NOT", None)
+    yes3.consolidate_ops()
+    print yes3.term
 
 def consolidate_test():
     tree = OpTree(['bill', 'gates', 'AND', 'steve', 'jobs', 'AND', 'AND'], None, None)
@@ -308,7 +344,8 @@ def process_queries(dictionary_file, postings_file, queries_file, output_file):
         for query in queries:
             tree = OpTree(shunting_yard(query), postings, dictionary)
             tree.root.consolidate_ops()
-            tree.root.calculate_expected()
+            tree.root.consolidate_children()
+            tree.root.calculate_expected(all_docIDs)
             result_IDs = [str(result_ID) for result_ID in tree.root.recursive_merge(all_docIDs)]
             result_IDs.append("\n")
             output.write(" ".join(result_IDs))
@@ -321,7 +358,7 @@ def main():
     # tree_initialization_test()
     # nots_test()
     # consolidate_test()
-    process_queries(dictionary_file, postings_file, queries_file, output_file)
+    # process_queries(dictionary_file, postings_file, queries_file, output_file)
 
 if __name__ == "__main__":
     main()
