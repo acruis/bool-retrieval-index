@@ -41,7 +41,8 @@ def index_doc(doc_name, postings_list):
 	doc = doc_file.read()
 	# Tokenize to doc content to sentences, then to words.
 	sentences = nltk.tokenize.sent_tokenize(doc)
-	words = set([word for sentence in sentences for word in nltk.tokenize.word_tokenize(sentence)])
+	stemmer = nltk.stem.porter.PorterStemmer()
+	words = set([stemmer.stem(word.lower()) for sentence in sentences for word in nltk.tokenize.word_tokenize(sentence)])
 	# Append doc to postings list.
 	# No need to sort the list if we call index_doc in sorted docID order.
 	for word in words:
@@ -106,18 +107,22 @@ def main():
 	docs_dir, dict_file, postings_file = parse_args()
 
 	print "Searching all documents in {}...".format(docs_dir),
+	sys.stdout.flush()
 	docs = load_all_doc_names(docs_dir)
 	print "DONE"
 
 	print "Constructing the inverted index...",
+	sys.stdout.flush()
 	postings_list = index_all_docs(docs)
 	print "DONE"
 
 	print "Writing postings to {}...".format(postings_file),
+	sys.stdout.flush()
 	dict_terms = write_postings(postings_list, postings_file)
 	print "DONE"
 
 	print "Writing dictionary to {}...".format(dict_file),
+	sys.stdout.flush()
 	docIDs = all_doc_IDs(docs)
 	create_dictionary(docIDs, dict_terms, dict_file)
 	print "DONE"

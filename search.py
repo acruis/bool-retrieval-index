@@ -128,7 +128,10 @@ def op_multi_or(list_of_postings_lists):
 
     while heap:
         smallest = heapq.heappop(heap)
-        if results and results[-1] != smallest: results.append(smallest)
+        if results:
+            if results[-1] != smallest: results.append(smallest)
+        else:
+            results.append(smallest)
 
     return results
 
@@ -234,14 +237,14 @@ class OpNode:
         self.children = descendant.children
         self.postings = descendant.postings
 
-    def deMorgans(self, children_nots):
+    def de_morgans(self, children_nots):
         children_of_nots = [child_not.children[0] for child_not in children_nots]
         center_grandchild = OpNode(children_of_nots, "OR" if self.op == "AND" else "AND", None)
         new_child_not = OpNode([center_grandchild], "NOT", None)
         self.children.append(new_child_not)
 
     def process_and_not(self, child_not, children_notnots):
-        new_child_and = OpNode([children_notnots], "AND", None)
+        new_child_and = OpNode(children_notnots, "AND", None)
         self.op = "AND NOT"
         self.children = [new_child_and, child_not.children[0]]
 
@@ -249,9 +252,9 @@ class OpNode:
         if self.children:
             if self.op == "OR" or self.op == "AND":
                 children_nots = [child for child in self.children if child.op == "NOT"]
-                self.children = [child for child in self.children if child.op != "NOT"]
                 if len(children_nots) > 1:
-                    self.deMorgans(children_nots)
+                    self.children = [child for child in self.children if child.op != "NOT"]
+                    self.de_morgans(children_nots)
             if self.op == "AND":
                 children_nots = [child for child in self.children if child.op == "NOT"]
                 children_notnots = [child for child in self.children if child.op != "NOT"]
@@ -363,7 +366,11 @@ def process_queries(dictionary_file, postings_file, queries_file, output_file):
     output = file(output_file, 'w')
     with open(queries_file) as queries:
         for query in queries:
+            output.write("one\n")
+            output.write(query)
             rpn_stack = shunting_yard(query)
+            output.write(repr(rpn_stack))
+            output.write("\n")
             if rpn_stack:
                 tree = OpTree(rpn_stack, postings, dictionary)
                 tree.root.consolidate_ops()
@@ -377,12 +384,21 @@ def process_queries(dictionary_file, postings_file, queries_file, output_file):
     postings.close()
     output.close()
 
+def and_not_test():
+    tree = OpTree(shunting_yard("money AND NOT possibility"), None, {})
+    print (tree.root.children[0].op, tree.root.children[0].term)
+    print (tree.root.children[1].op, tree.root.children[1].term)
+    print (tree.root.children[1].children[0].op, tree.root.children[1].children[0].term)
+    tree.root.consolidate_children()
+    print tree.root.op
+
 def main():
     dictionary_file, postings_file, queries_file, output_file = load_args()
 
     # tree_initialization_test()
     # nots_test()
     # consolidate_test()
+    # and_not_test()
     process_queries(dictionary_file, postings_file, queries_file, output_file)
 
 if __name__ == "__main__":
