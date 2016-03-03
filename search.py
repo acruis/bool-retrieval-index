@@ -74,52 +74,61 @@ def precedence(op):
 
 def op_and(p1, p2):
     result = []
+    i = 0
+    j = 0
 
-    while p1 and p2:
-        if p1[0] == p2[0]:
-            result.append(p1[0])
-            p1.pop(0)
-            p2.pop(0)
-        elif p1[0] < p2[0]:
-            p1.pop(0)
+    while i < len(p1) and i < len(p2):
+        if p1[i] == p2[j]:
+            result.append(p1[i])
+            i += 1
+            j += 1
+        elif p1[i] < p2[j]:
+            i += 1
         else:
-            p2.pop(0)
+            j += 1
 
     return result
 
 
 def op_or(p1, p2):
     result = []
+    i = 0
+    j = 0
 
-    while p1 and p2:
-        if p1[0] == p2[0]:
-            result.append(p1[0])
-            p1.pop(0)
-            p2.pop(0)
-        elif p1[0] < p2[0]:
-            result.append(p1.pop(0))
+    while i < len(p1) and i < len(p2):
+        if p1[i] == p2[j]:
+            result.append(p1[i])
+            i += 1
+            j += 1
+        elif p1[i] < p2[j]:
+            result.append(p1[i])
+            i += 1
         else:
-            result.append(p2.pop(0))
+            result.append(p2[j])
+            j += 1
 
-    if p1:
-        result.extend(p1)
+    if i < len(p1):
+        result.extend(p1[i:])
     else:
-        result.extend(p2)
+        result.extend(p2[j:])
 
     return result
 
 
 def op_not(p, all_p):
     result = []
+    i = 0
+    j = 0
 
-    while p and all_p:
-        if p[0] == all_p[0]:
-            p.pop(0)
-            all_p.pop(0)
+    while i < len(p) and i < len(all_p):
+        if p[i] == all_p[j]:
+            i += 1
+            j += 1
         else:
-            result.append(all_p.pop(0))
+            result.append(all_p[j])
+            j += 1
 
-    result.extend(all_p)
+    result.extend(all_p[j:])
 
     return result
 
