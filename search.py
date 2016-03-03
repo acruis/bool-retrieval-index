@@ -88,6 +88,46 @@ def precedence(op):
 def usage():
     print "usage: " + sys.argv[0] + " -d dictionary-file -p postings-file -q file-of-queries -o output-file-of-results"
 
+# Here be Dats!
+class OpNode:
+    op = None # "NOT", "AND" or "OR"
+    term = None
+    left_child = None
+    right_child = None
+    expected_postings = 0
+
+    def __init__(self, left, right, op, term):
+        self.left_child = left
+        self.right_child = right
+        self.op = op
+        self.term = term
+
+    def is_op():
+        return op != None
+
+    def read_postings_of_term(postings_file, dictionary):
+        term_pointer = dictionary[term][0]
+        postings_length = dictionary[term][1]
+        postings_file.seek(term_pointer)
+        return postings_file.read(postings_length).split()
+
+class OpTree:
+    root = None
+    op_list = ["NOT", "AND", "OR"]
+
+    def __init__(self, rpn_stack):
+        node_stack = []
+        for index, token in enumerate(rpn_stack):
+            if token in self.op_list:
+                right_child = node_stack.pop()
+                left_child = node_stack.pop()
+                node_stack.append(OpNode(left_child, right_child, token, None))
+            else:
+                node_stack.append(OpNode(None, None, None, token))
+            print [(node.op, node.term) for node in node_stack]
+        self.root = node_stack.pop()
+# Dat end tho
+
 if __name__ == "__main__":
     dictionary_file = postings_file = queries_file = output_file = None
 
@@ -110,3 +150,13 @@ if __name__ == "__main__":
     if dictionary_file == None or postings_file == None or queries_file == None or output_file == None:
         usage()
         sys.exit(2)
+
+    tree = OpTree(['bill', 'gates', 'AND', 'steve', 'jobs', 'AND', 'AND'])
+    root = tree.root
+    print root.left_child.left_child.term,
+    print root.left_child.op,
+    print root.left_child.right_child.term,
+    print root.op,
+    print root.right_child.left_child.term,
+    print root.right_child.op,
+    print root.right_child.right_child.term
