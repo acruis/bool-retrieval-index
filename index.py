@@ -39,8 +39,11 @@ def index_doc(doc_name, postings_list):
 	docID, doc_path = doc_name
 	doc_file = file(doc_path)
 	doc = doc_file.read()
+	# Tokenize to doc content to sentences, then to words.
 	sentences = nltk.tokenize.sent_tokenize(doc)
 	words = set([word for sentence in sentences for word in nltk.tokenize.word_tokenize(sentence)])
+	# Append doc to postings list.
+	# No need to sort the list if we call index_doc in sorted docID order.
 	for word in words:
 		if word in postings_list:
 			postings_list[word].append(docID)
@@ -50,7 +53,7 @@ def index_doc(doc_name, postings_list):
 
 def index_all_docs(docs):
 	postings_list = {}
-	for doc in docs[:10]:
+	for doc in docs[:10]: # slice for smaller postings file
 		index_doc(doc, postings_list)
 	return postings_list
 
@@ -67,6 +70,7 @@ def write_postings(postings_list, postings_file_name):
 	return dict_terms
 
 def all_doc_IDs(docs):
+	# O(doc_count).
 	return [docID for docID, doc_path in docs]
 
 def create_dictionary(docIDs, dict_terms, dict_file_name):
@@ -77,27 +81,46 @@ def create_dictionary(docIDs, dict_terms, dict_file_name):
 def usage():
 	print "usage: " + sys.argv[0] + " -i directory-of-documents -d dictionary-file -p postings-file"
 
-docs_dir = dict_file = postings_file = None
-try:
-    opts, args = getopt.getopt(sys.argv[1:], 'i:d:p:')
-except getopt.GetoptError, err:
-    usage()
-    sys.exit(2)
-for o, a in opts:
-    if o == '-i':
-        docs_dir = a
-    elif o == '-d':
-        dict_file = a
-    elif o == '-p':
-        postings_file = a
-    else:
-        assert False, "unhandled option"
-if docs_dir == None or dict_file == None or postings_file == None:
-    usage()
-    sys.exit(2)
+def parse_args():
+	docs_dir = dict_file = postings_file = None
+	try:
+	    opts, args = getopt.getopt(sys.argv[1:], 'i:d:p:')
+	except getopt.GetoptError, err:
+	    usage()
+	    sys.exit(2)
+	for o, a in opts:
+	    if o == '-i':
+	        docs_dir = a
+	    elif o == '-d':
+	        dict_file = a
+	    elif o == '-p':
+	        postings_file = a
+	    else:
+	        assert False, "unhandled option"
+	if docs_dir == None or dict_file == None or postings_file == None:
+	    usage()
+	    sys.exit(2)
+	return (docs_dir, dict_file, postings_file)
 
-docs = load_all_doc_names(docs_dir)
-postings_list = index_all_docs(docs)
-dict_terms = write_postings(postings_list, postings_file)
-docIDs = all_doc_IDs(docs)
-create_dictionary(docIDs, dict_terms, dict_file)
+def main():
+	docs_dir, dict_file, postings_file = parse_args()
+
+	print "Searching all documents in {}...".format(docs_dir),
+	docs = load_all_doc_names(docs_dir)
+	print "DONE"
+
+	print "Constructing the inverted index...",
+	postings_list = index_all_docs(docs)
+	print "DONE"
+
+	print "Writing postings to {}...".format(postings_file),
+	dict_terms = write_postings(postings_list, postings_file)
+	print "DONE"
+
+	print "Writing dictionary to {}...".format(dict_file),
+	docIDs = all_doc_IDs(docs)
+	create_dictionary(docIDs, dict_terms, dict_file)
+	print "DONE"
+
+if __name__ == "__main__":
+	main()
