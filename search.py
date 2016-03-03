@@ -196,7 +196,9 @@ class OpNode:
         elif self.op == "OR":
             return op_or(children_postings[0], children_postings[1])
         elif self.op == "AND":
-            return op_and(children_postings[0], children_postings[1])
+            return op_multi_and(children_postings)
+        elif self.op == "AND NOT":
+            return op_and_not(children_postings[0], children_postings[1])
 
     def recursive_merge(self, all_docIDs):
         if self.op != None:
@@ -257,8 +259,8 @@ class OpNode:
     def consolidate_children(self):
         if self.children:
             if self.op == "OR" or self.op == "AND":
-                children_nots = [child_not for child in self.children if child.op == "NOT"]
-                self.children = [child_notnot for child in self.children if child.op != "NOT"]
+                children_nots = [child_not for child_not in self.children if child.op == "NOT"]
+                self.children = [child_notnot for child_notnot in self.children if child.op != "NOT"]
                 if len(children_nots) > 1:
                     self.deMorgans(children_nots)
             if self.op == "AND":
