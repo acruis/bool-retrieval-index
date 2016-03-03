@@ -139,7 +139,7 @@ def usage():
 
 # Here be Dats!
 class OpNode:
-    op = None # "NOT", "AND" or "OR"
+    op = None # "NOT", "AND", "OR" or "AND NOT"
     term = None
     children = None
     postings = []
