@@ -1,3 +1,5 @@
-bill OR Gates AND (vista OR XP) AND NOT mac
-bill AND gates AND steve
-(bill AND gates) AND (steve AND jobs)
+profits
+mln
+sales
+profits OR mln
+(profits OR mln) AND sales

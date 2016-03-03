@@ -21,7 +21,7 @@ import re
 import nltk
 import sys
 import getopt
-
+import json
 
 def magic(queries_file, out_file):
     with open(queries_file) as queries_data, open(out_file, 'w+') as results_data:
@@ -134,7 +134,7 @@ class OpNode:
     term = None
     children = None
     postings = []
-    expected_postings = 0
+    expected_count = 0
 
     def __init__(self, children, op, term):
         self.children = children
@@ -151,20 +151,17 @@ class OpNode:
             postings_file.seek(term_pointer)
             self.postings = [int(docID) for docID in postings_file.read(postings_length).split()]
 
-    def merge(children_postings):
-        if op == "NOT":
-            # return not(children_postings[0], all_docIDs)
-            pass
-        elif op == "OR":
-            # return or(children_postings)
-            pass
-        elif op == "AND":
-            # return and(children_postings)
-            pass
+    def merge(self, children_postings):
+        if self.op == "NOT":
+            return op_not(children_postings[0], all_docIDs)
+        elif self.op == "OR":
+            return op_or(children_postings[0], children_postings[1])
+        elif self.op == "AND":
+            return op_and(children_postings[0], children_postings[1])
 
     def recursive_merge(self):
         if self.op != None:
-            children_postings = [child.recursive_merge for child in children]
+            children_postings = [child.recursive_merge() for child in self.children]
             return self.merge(children_postings)
         else:
             return self.postings
@@ -185,9 +182,7 @@ class OpNode:
             return self.children[0].consolidate_not_recursive(not effective)
 
     def consolidate_ops(self):
-        if self.op == None:
-            self.expected_postings = len(self.postings)
-        elif self.op == "AND":
+        if self.op == "AND":
             self.children = self.consolidate_ops_recursive("AND")
         elif self.op == "OR":
             self.children = self.consolidate_ops_recursive("OR")
@@ -195,6 +190,24 @@ class OpNode:
             child, effective = self.consolidate_not_recursive(False)
             if effective:
                 self.children = [child]
+        elif self.op == None:
+            return
+
+        for child in self.children:
+            child.consolidate_ops()
+
+    def calculate_expected(self):
+        if self.op == None:
+            self.expected_count = len(self.postings)
+        elif self.op == "AND":
+            for child in self.children: child.calculate_expected()
+            self.expected_count = min([child.expected_count for child in self.children])
+        elif self.op == "OR":
+            for child in self.children: child.calculate_expected()
+            self.expected_count = sum([child.expected_count for child in self.children])
+        elif self.op == "NOT":
+            self.children[0].calculate_expected()
+            self.expected_count = len(all_docIDs) - self.children[0].expected_count
 
 class OpTree:
     root = None
@@ -215,7 +228,7 @@ class OpTree:
                     node_stack.append(OpNode([child], token, None))
             else:
                 token_node = OpNode(None, None, token)
-                # token_node.read_postings_of_term(postings_file, dictionary)
+                token_node.read_postings_of_term(postings_file, dictionary)
                 node_stack.append(token_node)
             print [(node.op, node.term) for node in node_stack]
         self.root = node_stack.pop()
@@ -258,7 +271,6 @@ if __name__ == "__main__":
     print root.children[1].children[1].term
     '''
 
-    '''
     # nots
     yes = OpNode(None, None, "Hi!")
     no = OpNode([yes], "NOT", None)
@@ -268,10 +280,31 @@ if __name__ == "__main__":
     no2 = OpNode([yes2], "NOT", None)
     no2.consolidate_ops()
     print no2.children[0].term
+
+    '''
+    # load dictionary
+    with open(dictionary_file) as dict_file:
+        all_docIDs, dictionary = json.load(dict_file)
+
+    # open queries
+    postings = file(postings_file)
+    output = file(output_file, 'w')
+    with open(queries_file) as queries:
+        for query in queries:
+            tree = OpTree(shunting_yard(query), postings, dictionary)
+            tree.root.consolidate_ops()
+            tree.root.calculate_expected()
+            result_IDs = [str(result_ID) for result_ID in tree.root.recursive_merge()]
+            result_IDs.append("\n")
+            output.write(" ".join(result_IDs))
+    postings.close()
+    output.close()
     '''
 
+    '''
     tree = OpTree(['bill', 'gates', 'AND', 'steve', 'jobs', 'AND', 'AND'], None, None)
     tree.root.consolidate_ops()
     print len(tree.root.children)
     for child in tree.root.children:
         print child.term
+    '''
