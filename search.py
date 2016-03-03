@@ -102,12 +102,12 @@ class OpNode:
         self.op = op
         self.term = term
 
-    def is_op():
-        return op != None
+    def is_op(self):
+        return self.op != None
 
-    def read_postings_of_term(postings_file, dictionary):
-        term_pointer = dictionary[term][0]
-        postings_length = dictionary[term][1]
+    def read_postings_of_term(self, postings_file, dictionary):
+        term_pointer = dictionary[self.term][0]
+        postings_length = dictionary[self.term][1]
         postings_file.seek(term_pointer)
         return postings_file.read(postings_length).split()
 
