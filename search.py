@@ -201,17 +201,19 @@ class OpNode:
     def is_op(self):
         """Boolean check if node is a type of operator.
 
-        :return:A boolean value. True if operator. False if search token node.
+        :return:A boolean value. True if is operator node. False if is search token node.
         """
         return self.op != None
 
     def read_postings_of_term(self, postings_file, dictionary):
-        """ Gets own postings list for search token node.
+        """ Gets own postings list from file and stores it in its attribute. For search token nodes only.
 
-        :param postings_file:
-        :param dictionary:
-        :return:
+        :param postings_file: File object referencing the file containing the complete set of postings lists.
+        :param dictionary: Dictionary that takes search token keys, and returns a tuple of pointer and length.
+            The pointer points to the starting point of the search token's postings list in the file.
+            The length refers to the length of the search token's postings list in bytes.
         """
+
         if self.term in dictionary:
             term_pointer = dictionary[self.term][0]
             postings_length = dictionary[self.term][1]
@@ -219,6 +221,12 @@ class OpNode:
             self.postings = [int(docID) for docID in postings_file.read(postings_length).split()]
 
     def merge(self, children_postings, all_docIDs):
+        """Resolves operator nodes, and returns a list containing the resulting docIDs. For operator nodes only.
+
+        :param children_postings: A list of child search token nodes' postings lists
+        :param all_docIDs: The list of all docIDs possible.
+        :return: A list containing the resulting docIDs after resolving the operator.
+        """
         if self.op == "NOT":
             return op_not(children_postings[0], all_docIDs)
         elif self.op == "OR":
@@ -229,6 +237,13 @@ class OpNode:
             return op_and_not(children_postings[0], children_postings[1])
 
     def recursive_merge(self, all_docIDs):
+        """Recursively resolves self and child operator nodes, and returns a list containing the resulting docIDs.
+
+        For search token nodes, returns its postings list.
+
+        :param all_docIDs: The list of all docIDs possible.
+        :return: A list containing resulting docIDs after resolving operators, or postings list for search token nodes
+        """
         if self.op != None:
             children_postings = [child.recursive_merge(all_docIDs) for child in self.children]
             return self.merge(children_postings, all_docIDs)
@@ -315,6 +330,7 @@ class OpNode:
         elif self.op == "NOT":
             self.children[0].calculate_expected(all_docIDs)
             self.expected_count = len(all_docIDs) - self.children[0].expected_count
+
 
 class OpTree:
     """Models a Reverse Polish Notation search query with a tree.
