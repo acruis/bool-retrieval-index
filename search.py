@@ -5,45 +5,6 @@ import getopt
 import json
 import heapq
 
-def magic(queries_file, out_file):
-    with open(queries_file) as queries_data, open(out_file, 'w+') as results_data:
-        for line in queries_file:
-            pass
-
-
-# queries: ( ) NOT AND OR, in decreasing order of precedence
-# single words conjoined with boolean ops in CAPS
-# no nested parantheses
-# returns a stack in Reverse Polish Notation
-def shunting_yard(query):
-    query_tokens = nltk.word_tokenize(query)
-    rpn_stack = []
-    op_stack = []
-    op_list = ["NOT", "AND", "OR"]
-
-    for token in query_tokens:
-        if token not in op_list and token not in ["(", ")"]: # is search token
-            rpn_stack.append(token)
-        elif token in op_list:
-            while op_stack and precedence(token) <= precedence(peek(op_stack)):
-                rpn_stack.append(op_stack.pop())
-            op_stack.append(token)
-        elif token == "(":
-            op_stack.append(token)
-        elif token == ")":
-            while op_stack and peek(op_stack) != "(":
-                rpn_stack.append(op_stack.pop())
-            op_stack.pop()
-
-    while op_stack:
-        rpn_stack.append(op_stack.pop())
-
-    return rpn_stack
-
-
-def peek(lst):
-    return lst[-1]
-
 
 def precedence(op):
     return {
@@ -54,6 +15,34 @@ def precedence(op):
         }[op]
 
 
+# Returns a stack of search tokens and operators in Reverse Polish Notation
+def shunting_yard(query):
+    query_tokens = nltk.word_tokenize(query)
+    rpn_stack = []
+    op_stack = []
+    op_list = ["NOT", "AND", "OR"]
+
+    for token in query_tokens:
+        if token not in op_list and token not in ["(", ")"]:
+            rpn_stack.append(token)
+        elif token in op_list:
+            while op_stack and precedence(token) <= precedence(op_stack[-1]):
+                rpn_stack.append(op_stack.pop())
+            op_stack.append(token)
+        elif token == "(":
+            op_stack.append(token)
+        elif token == ")":
+            while op_stack and op_stack[-1] != "(":
+                rpn_stack.append(op_stack.pop())
+            op_stack.pop()
+
+    while op_stack:
+        rpn_stack.append(op_stack.pop())
+
+    return rpn_stack
+
+
+# Returns list result of p1 AND p2
 def op_and(p1, p2):
     result = []
     i = 0
@@ -72,6 +61,7 @@ def op_and(p1, p2):
     return result
 
 
+# Returns list result of p1 AND p2 AND ... AND pN
 def op_multi_and(list_of_postings_lists):
     list_of_postings_lists.sort(key=len)
     result = list_of_postings_lists[0]
@@ -82,6 +72,7 @@ def op_multi_and(list_of_postings_lists):
     return result
 
 
+# Returns list result of p1 AND NOT p2
 def op_and_not(p1, p2):
     result = []
     i = 0
@@ -102,6 +93,7 @@ def op_and_not(p1, p2):
     return result
 
 
+# Returns list result of p1 OR p2
 def op_or(p1, p2):
     result = []
     i = 0
@@ -140,6 +132,8 @@ def op_multi_or(list_of_postings_lists):
 
     return results
 
+
+# Returns list result of NOT p
 def op_not(p, all_p):
     result = []
     i = 0
