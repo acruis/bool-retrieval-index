@@ -6,18 +6,28 @@ import json
 import heapq
 
 
-# For shunting_yard's use only
 def precedence(op):
+    """Given operator type, returns the precedence order of operator.
+
+    Higher precedence order is reflected by higher return value. For use with shunting_yard only.
+
+    :param op: Operator type in string.
+    :return: An integer reflecting the precedence order of the operator. Higher precedence = higher integer value.
+    """
     return {
         "OR": 0,
         "AND": 1,
         "NOT": 2,
-        "(": -1, # never executed as an operation
+        "(": -1, # never executed as an operator
         }[op]
 
 
-# Returns a stack of search tokens and operators in Reverse Polish Notation
 def shunting_yard(query):
+    """Returns a list of search tokens and operators in Reverse Polish Notation.
+
+    :param query: A string containing the search query.
+    :return: A list of search tokens and operators in Reverse Polish Notation.
+    """
     query_tokens = nltk.word_tokenize(query)
     stemmer = nltk.stem.PorterStemmer()
     rpn_stack = []
@@ -44,8 +54,13 @@ def shunting_yard(query):
     return rpn_stack
 
 
-# Returns list result of p1 AND p2
 def op_and(p1, p2):
+    """Evaluates p1 AND p2 and returns result as list.
+
+    :param p1: A list containing the first postings list.
+    :param p2: A list containing the second postings list.
+    :return: A list containing the result of p1 AND p2.
+    """
     result = []
     i = 0
     j = 0
@@ -63,8 +78,12 @@ def op_and(p1, p2):
     return result
 
 
-# Returns list result of p1 AND p2 AND ... AND pN
 def op_multi_and(list_of_postings_lists):
+    """Evaluates p1 AND p2 AND ... AND pN and returns result as list.
+
+    :param list_of_postings_lists: A list of postings lists.
+    :return: A list containing the result of p1 AND p2 AND ... AND pN.
+    """
     list_of_postings_lists.sort(key=len)
     result = list_of_postings_lists[0]
 
@@ -74,8 +93,13 @@ def op_multi_and(list_of_postings_lists):
     return result
 
 
-# Returns list result of p1 AND NOT p2
 def op_and_not(p1, p2):
+    """Evaluates p1 AND NOT p2 and returns result as list.
+
+    :param p1: A list containing the first postings list.
+    :param p2: A list containing the second postings list.
+    :return: A list containing the result of p1 AND NOT p2.
+    """
     result = []
     i = 0
     j = 0
@@ -95,8 +119,13 @@ def op_and_not(p1, p2):
     return result
 
 
-# Returns list result of p1 OR p2
 def op_or(p1, p2):
+    """Evaluates p1 OR p2 and returns result as list.
+
+    :param p1: A list containing the first postings list.
+    :param p2: A list containing the second postings list.
+    :return: A list containing the result of p1 OR p2.
+    """
     result = []
     i = 0
     j = 0
@@ -121,8 +150,12 @@ def op_or(p1, p2):
     return result
 
 
-# Returns list result of p1 OR p2 OR ... OR pN
 def op_multi_or(list_of_postings_lists):
+    """Evaluates p1 OR p2 OR ... OR pN and returns result as list.
+
+    :param list_of_postings_lists: A list of postings lists.
+    :return: A list containing the result of p1 OR p2 OR ... OR pN.
+    """
     heap = []
     results = []
     for postings in list_of_postings_lists:
@@ -139,8 +172,13 @@ def op_multi_or(list_of_postings_lists):
     return results
 
 
-# Returns list result of NOT p
 def op_not(p, all_p):
+    """Evaluates NOT p and returns result as list.
+
+    :param p: A list containing the postings list.
+    :param all_p: A list containing the postings list that includes every docID.
+    :return: A list containing the result of NOT p.
+    """
     result = []
     i = 0
     j = 0
@@ -162,7 +200,6 @@ def usage():
     print "usage: " + sys.argv[0] + " -d dictionary-file -p postings-file -q file-of-queries -o output-file-of-results"
 
 
-# Here be Dats!
 class OpNode:
     """Nodes for tree used to model a search query in Reverse Polish Notation.
 
@@ -220,6 +257,20 @@ class OpNode:
             postings_file.seek(term_pointer)
             self.postings = [int(docID) for docID in postings_file.read(postings_length).split()]
 
+    def recursive_merge(self, all_docIDs):
+        """Recursively resolves self and child operator nodes, and returns a list containing the resulting docIDs.
+
+        For search token nodes, returns its postings list.
+
+        :param all_docIDs: The list of all docIDs possible.
+        :return: A list containing resulting docIDs after resolving operators, or postings list for search token nodes
+        """
+        if self.op != None:
+            children_postings = [child.recursive_merge(all_docIDs) for child in self.children]
+            return self.merge(children_postings, all_docIDs)
+        else:
+            return self.postings
+
     def merge(self, children_postings, all_docIDs):
         """Resolves operator nodes, and returns a list containing the resulting docIDs. For operator nodes only.
 
@@ -236,21 +287,12 @@ class OpNode:
         elif self.op == "AND NOT":
             return op_and_not(children_postings[0], children_postings[1])
 
-    def recursive_merge(self, all_docIDs):
-        """Recursively resolves self and child operator nodes, and returns a list containing the resulting docIDs.
-
-        For search token nodes, returns its postings list.
-
-        :param all_docIDs: The list of all docIDs possible.
-        :return: A list containing resulting docIDs after resolving operators, or postings list for search token nodes
-        """
-        if self.op != None:
-            children_postings = [child.recursive_merge(all_docIDs) for child in self.children]
-            return self.merge(children_postings, all_docIDs)
-        else:
-            return self.postings
-
     def consolidate_ops_recursive(self, required_op):
+        """
+
+        :param required_op: The operator type that is being consolidated.
+        :return:
+        """
         if self.op != required_op:
             return [self]
         else:
@@ -332,6 +374,10 @@ class OpNode:
 class OpTree:
     """Models a Reverse Polish Notation search query with a tree.
 
+    Nodes in tree represents operators or search tokens, as defined by OpNode class.
+
+    Attributes:
+        root: Points to the OpNode that serves as the root node.
     """
     root = None
     op_list = ["NOT", "AND", "OR"]
@@ -355,7 +401,9 @@ class OpTree:
                 node_stack.append(token_node)
             print [(node.op, node.term) for node in node_stack]
         self.root = node_stack.pop()
-# Dat end tho
+
+
+# TESTS #
 
 
 def tree_initialization_test():
@@ -387,6 +435,10 @@ def consolidate_test():
     print len(tree.root.children)
     for child in tree.root.children:
         print child.term
+
+
+# END TESTS #
+
 
 def load_args():
     dictionary_file = postings_file = queries_file = output_file = None
