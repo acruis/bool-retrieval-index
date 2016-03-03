@@ -341,7 +341,6 @@ class OpTree:
 
     def __init__(self, rpn_stack, postings_file, dictionary):
         node_stack = []
-        # print "--- Nodes ---"
         for token in rpn_stack:
             if token in self.op_list:
                 if token != "NOT":
@@ -356,10 +355,7 @@ class OpTree:
                 token_node = OpNode(None, None, token)
                 token_node.read_postings_of_term(postings_file, dictionary)
                 node_stack.append(token_node)
-            # print [(node.op, node.term) for node in node_stack]
         self.root = node_stack.pop()
-# Dat end tho
-
 
 def tree_initialization_test():
     tree = OpTree(['bill', 'gates', 'AND', 'steve', 'jobs', 'AND', 'AND'], None, None)
@@ -426,11 +422,7 @@ def process_queries(dictionary_file, postings_file, queries_file, output_file):
     output = file(output_file, 'w')
     with open(queries_file) as queries:
         for query in queries:
-            # output.write("one\n")
-            # output.write(query)
             rpn_stack = shunting_yard(query)
-            # output.write(repr(rpn_stack))
-            # output.write("\n")
             if rpn_stack:
                 tree = OpTree(rpn_stack, postings, dictionary)
                 tree.root.consolidate_ops()
