@@ -1,8 +1,26 @@
-# Do indexing!
+'''
+Dictionary format:
+[
+	[1, 2, 3, 4, 5, 11],
+	{
+		"hi": [0, 2],
+		"bye": [3, 1]
+	}
+]
+
+[] = list
+{} = dict
+(no tuples)
+
+All docIDs in a list: 				dictionary[0]
+Pointer to "retrieval": 			dictionary[1]["retrieval"][0]
+Length of postings for "retrieval": dictionary[1]["retrieval"][1]
+'''
 
 import getopt
 import sys
 import nltk
+import json
 from os import listdir
 from os.path import isfile, join
 try:
@@ -10,29 +28,51 @@ try:
 except:
 	import pickle
 
-def loadAllDocNames(docs_dir):
+def load_all_doc_names(docs_dir):
 	sorted_members = sorted([int(dir_member) for dir_member in listdir(docs_dir)])
 	# Additional check for only files in directory
 	joined_members = [(dir_member, join(docs_dir, str(dir_member))) for dir_member in sorted_members]
 	joined_files = [(member_name, member_path) for member_name, member_path in joined_members if isfile(member_path)]
 	return joined_files
 
-def indexDoc(doc_name, postings):
+def index_doc(doc_name, postings_list):
 	docID, doc_path = doc_name
-	doc = file(doc_path).read()
+	doc_file = file(doc_path)
+	doc = doc_file.read()
 	sentences = nltk.tokenize.sent_tokenize(doc)
 	words = set([word for sentence in sentences for word in nltk.tokenize.word_tokenize(sentence)])
 	for word in words:
-		if word in postings:
-			postings[word].append(docID)
+		if word in postings_list:
+			postings_list[word].append(docID)
 		else:
-			postings[word] = [docID]
+			postings_list[word] = [docID]
+	doc_file.close()
 
-def indexAllDocs(docs):
-	postings = {}
+def index_all_docs(docs):
+	postings_list = {}
 	for doc in docs[:10]:
-		indexDoc(doc, postings)
-	return postings
+		index_doc(doc, postings_list)
+	return postings_list
+
+def write_postings(postings_list, postings_file_name):
+	postings_file = file(postings_file_name, 'w')
+	dict_terms = {}
+	for term, docIDs in postings_list.iteritems():
+		posting_pointer = postings_file.tell()
+		postings_file.write(" ".join([str(docID) for docID in docIDs]))
+		write_length = postings_file.tell() - posting_pointer
+		postings_file.write("\n")
+		dict_terms[term] = (posting_pointer, write_length)
+	postings_file.close()
+	return dict_terms
+
+def all_doc_IDs(docs):
+	return [docID for docID, doc_path in docs]
+
+def create_dictionary(docIDs, dict_terms, dict_file_name):
+	dict_file = file(dict_file_name, 'w')
+	json.dump([docIDs, dict_terms], dict_file)
+	dict_file.close()
 
 def usage():
 	print "usage: " + sys.argv[0] + " -i directory-of-documents -d dictionary-file -p postings-file"
@@ -56,8 +96,8 @@ if docs_dir == None or dict_file == None or postings_file == None:
     usage()
     sys.exit(2)
 
-print docs_dir
-print dict_file
-print postings_file
-docs = loadAllDocNames(docs_dir)
-postings = indexAllDocs(docs)
+docs = load_all_doc_names(docs_dir)
+postings_list = index_all_docs(docs)
+dict_terms = write_postings(postings_list, postings_file)
+docIDs = all_doc_IDs(docs)
+create_dictionary(docIDs, dict_terms, dict_file)
