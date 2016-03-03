@@ -7,6 +7,11 @@ import heapq
 import time
 import math
 
+'''
+Removing/Normalizing numbers
+Remove stop words (observe change in dict/postings)
+'''
+
 def precedence(op):
     """Given operator type, returns the precedence order of operator.
 
