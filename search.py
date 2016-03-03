@@ -4,7 +4,8 @@ import sys
 import getopt
 import json
 import heapq
-
+import time
+import math
 
 def precedence(op):
     """Given operator type, returns the precedence order of operator.
@@ -53,6 +54,20 @@ def shunting_yard(query):
 
     return rpn_stack
 
+def get_skip_flags(len1, len2):
+    skip1 = int(math.sqrt(len1))
+    skip2 = int(math.sqrt(len2))
+    flags1 = [False] * len1
+    flags2 = [False] * len2
+    a = 0
+    b = 0
+    while a < len1:
+        flags1[a] = True
+        a += skip1
+    while b < len2:
+        flags2[b] = True
+        b += skip2
+    return (skip1, skip2, flags1, flags2)
 
 def op_and(p1, p2):
     """Evaluates p1 AND p2 and returns result as list.
@@ -64,6 +79,7 @@ def op_and(p1, p2):
     result = []
     i = 0
     j = 0
+    skip_dist1, skip_dist2, can_skip1, can_skip2 = get_skip_flags(len(p1), len(p2))
 
     while i < len(p1) and j < len(p2):
         if p1[i] == p2[j]:
@@ -71,10 +87,24 @@ def op_and(p1, p2):
             i += 1
             j += 1
         elif p1[i] < p2[j]:
-            i += 1
+            if can_skip1[i]:
+                lookahead = i + skip_dist1
+                if lookahead < len(p1) and p1[lookahead] <= p2[j]:
+                    i += skip_dist1
+                else:
+                    i += 1
+            else:
+                i += 1
         else:
-            j += 1
-
+            if can_skip2[j]:
+                lookahead = j + skip_dist2
+                if lookahead < len(p2) and p2[lookahead] <= p1[i]:
+                    j += skip_dist2
+                else:
+                    j += 1
+            else:
+                j += 1
+                
     return result
 
 
@@ -103,6 +133,7 @@ def op_and_not(p1, p2):
     result = []
     i = 0
     j = 0
+    skip_dist1, skip_dist2, can_skip1, can_skip2 = get_skip_flags(len(p1), len(p2))
 
     while i < len(p1) and j < len(p2):
         if p1[i] == p2[j]:
@@ -112,7 +143,14 @@ def op_and_not(p1, p2):
             result.append(p1[i])
             i += 1
         else:
-            j += 1
+            if can_skip2[j]:
+                lookahead = j + skip_dist2
+                if lookahead < len(p2) and p2[lookahead] <= p1[i]:
+                    j += skip_dist2
+                else:
+                    j += 1
+            else:
+                j += 1
 
     result.extend(p1[i:])
 
@@ -195,7 +233,6 @@ def op_not(p, all_p):
 
     return result
 
-
 def usage():
     print "usage: " + sys.argv[0] + " -d dictionary-file -p postings-file -q file-of-queries -o output-file-of-results"
 
@@ -223,7 +260,7 @@ class OpNode:
     def __init__(self, children, op, term):
         """Inits OpNode with a list of its child nodes, its operator type, and its search token, where applicable.
 
-        Only operator nodes should have children, and has an operator type: "NOT", "AND", "OR", "AND NOT".
+        Only operator nodes should have children, and has an operator type: "NOT", "AND", "OR", "AND NOT".HEAD
         Only search token nodes have a search token value, and has an operator type: None.
 
         :param children: A list of OpNode instances. Only operator nodes have children.
@@ -334,7 +371,7 @@ class OpNode:
         children_of_nots = [child_not.children[0] for child_not in children_nots]
         center_grandchild = OpNode(children_of_nots, "OR" if self.op == "AND" else "AND", None)
         new_child_not = OpNode([center_grandchild], "NOT", None)
-        self.children.append(new_child_not)
+        return new_child_not
 
     def process_and_not(self, child_not, children_notnots):
         new_child_and = OpNode(children_notnots, "AND", None)
@@ -346,12 +383,15 @@ class OpNode:
             if self.op == "OR" or self.op == "AND":
                 children_nots = [child for child in self.children if child.op == "NOT"]
                 if len(children_nots) > 1:
-                    self.children = [child for child in self.children if child.op != "NOT"]
-                    self.de_morgans(children_nots)
+                    if len(children_nots) == len(self.children): # de Morgan's completely wipes out children, so morph into NOT node
+                        self.copy_descendant_info(self.de_morgans(children_nots))
+                    else: # There are non-NOT children, so maintain current op in current node
+                        self.children = [child for child in self.children if child.op != "NOT"]
+                        self.children.append(self.de_morgans(children_nots))
             if self.op == "AND":
                 children_nots = [child for child in self.children if child.op == "NOT"]
                 children_notnots = [child for child in self.children if child.op != "NOT"]
-                if children_nots:
+                if children_nots: # There are non-NOT children, and a single NOT child (de Morgan's prevents more NOTs), so morph into AND NOT
                     assert(len(children_nots) == 1)
                     self.process_and_not(children_nots[0], children_notnots)
             for child in self.children:
@@ -384,7 +424,6 @@ class OpTree:
 
     def __init__(self, rpn_stack, postings_file, dictionary):
         node_stack = []
-        print "--- Nodes ---"
         for token in rpn_stack:
             if token in self.op_list:
                 if token != "NOT":
@@ -399,7 +438,6 @@ class OpTree:
                 token_node = OpNode(None, None, token)
                 token_node.read_postings_of_term(postings_file, dictionary)
                 node_stack.append(token_node)
-            print [(node.op, node.term) for node in node_stack]
         self.root = node_stack.pop()
 
 
@@ -466,6 +504,7 @@ def load_args():
 
 def process_queries(dictionary_file, postings_file, queries_file, output_file):
     # load dictionary
+    begin = time.time() * 1000.0
     with open(dictionary_file) as dict_file:
         all_docIDs, dictionary = json.load(dict_file)
 
@@ -474,11 +513,7 @@ def process_queries(dictionary_file, postings_file, queries_file, output_file):
     output = file(output_file, 'w')
     with open(queries_file) as queries:
         for query in queries:
-            output.write("one\n")
-            output.write(query)
             rpn_stack = shunting_yard(query)
-            output.write(repr(rpn_stack))
-            output.write("\n")
             if rpn_stack:
                 tree = OpTree(rpn_stack, postings, dictionary)
                 tree.root.consolidate_ops()
@@ -491,6 +526,8 @@ def process_queries(dictionary_file, postings_file, queries_file, output_file):
                 output.write("\n")
     postings.close()
     output.close()
+    after = time.time() * 1000.0
+    print after-begin
 
 def and_not_test():
     tree = OpTree(shunting_yard("money AND NOT possibility"), None, {})
@@ -500,6 +537,16 @@ def and_not_test():
     tree.root.consolidate_children()
     print tree.root.op
 
+def random_skips_test():
+    even = [guy for guy in range(5000000) if guy % 2 == 0]
+    # odd = [guy for guy in range(5000000) if guy % 1000 == 0]
+    odd = [5000001]
+
+    begin = time.time() * 1000.0
+    _ = op_and(even, odd)
+    after = time.time() * 1000.0
+    print after-begin
+
 def main():
     dictionary_file, postings_file, queries_file, output_file = load_args()
 
@@ -507,6 +554,7 @@ def main():
     # nots_test()
     # consolidate_test()
     # and_not_test()
+    # random_skips_test()
     process_queries(dictionary_file, postings_file, queries_file, output_file)
 
 if __name__ == "__main__":
