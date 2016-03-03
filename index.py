@@ -53,7 +53,7 @@ def index_doc(doc_name, postings_list):
 
 def index_all_docs(docs):
 	postings_list = {}
-	for doc in docs[:10]: # slice for smaller postings file
+	for doc in docs: # slice for smaller postings file
 		index_doc(doc, postings_list)
 	return postings_list
 

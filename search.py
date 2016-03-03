@@ -233,16 +233,16 @@ class OpNode:
     def consolidate_children(self):
         if self.children:
             if self.op == "OR" or self.op == "AND":
-                children_nots = [child_not for child_not in self.children if child.op == "NOT"]
-                self.children = [child_notnot for child_notnot in self.children if child.op != "NOT"]
+                children_nots = [child for child in self.children if child.op == "NOT"]
+                self.children = [child for child in self.children if child.op != "NOT"]
                 if len(children_nots) > 1:
                     self.deMorgans(children_nots)
             if self.op == "AND":
-                children_nots = [child_not for child in self.children if child.op == "NOT"]
-                children_notnots = [child_notnot for child in self.children if child.op != "NOT"]
+                children_nots = [child for child in self.children if child.op == "NOT"]
+                children_notnots = [child for child in self.children if child.op != "NOT"]
                 if children_nots:
                     assert(len(children_nots) == 1)
-                    processAndNot(children_not[0], children_notnots)
+                    self.process_and_not(children_nots[0], children_notnots)
             for child in self.children:
                 child.consolidate_children()
 
@@ -364,7 +364,7 @@ def main():
     # tree_initialization_test()
     # nots_test()
     # consolidate_test()
-    # process_queries(dictionary_file, postings_file, queries_file, output_file)
+    process_queries(dictionary_file, postings_file, queries_file, output_file)
 
 if __name__ == "__main__":
     main()
