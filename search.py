@@ -94,6 +94,7 @@ class OpNode:
     term = None
     left_child = None
     right_child = None
+    postings = []
     expected_postings = 0
 
     def __init__(self, left, right, op, term):
@@ -109,21 +110,25 @@ class OpNode:
         term_pointer = dictionary[self.term][0]
         postings_length = dictionary[self.term][1]
         postings_file.seek(term_pointer)
-        return postings_file.read(postings_length).split()
+        self.postings = postings_file.read(postings_length).split()
+        self.expected_postings = len(self.postings)
 
 class OpTree:
     root = None
     op_list = ["NOT", "AND", "OR"]
 
-    def __init__(self, rpn_stack):
+    def __init__(self, rpn_stack, postings_file, dictionary):
         node_stack = []
-        for index, token in enumerate(rpn_stack):
+        print "--- Nodes ---"
+        for token in rpn_stack:
             if token in self.op_list:
                 right_child = node_stack.pop()
                 left_child = node_stack.pop()
                 node_stack.append(OpNode(left_child, right_child, token, None))
             else:
-                node_stack.append(OpNode(None, None, None, token))
+                token_node = OpNode(None, None, None, token)
+                # token_node.read_postings_of_term(postings_file, dictionary)
+                node_stack.append(token_node)
             print [(node.op, node.term) for node in node_stack]
         self.root = node_stack.pop()
 # Dat end tho
@@ -151,7 +156,8 @@ if __name__ == "__main__":
         usage()
         sys.exit(2)
 
-    tree = OpTree(['bill', 'gates', 'AND', 'steve', 'jobs', 'AND', 'AND'])
+    tree = OpTree(['bill', 'gates', 'AND', 'steve', 'jobs', 'AND', 'AND'], None, None)
+    print "--- How tree looks like ---"
     root = tree.root
     print root.left_child.left_child.term,
     print root.left_child.op,
