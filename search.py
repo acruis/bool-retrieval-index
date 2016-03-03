@@ -363,13 +363,17 @@ def process_queries(dictionary_file, postings_file, queries_file, output_file):
     output = file(output_file, 'w')
     with open(queries_file) as queries:
         for query in queries:
-            tree = OpTree(shunting_yard(query), postings, dictionary)
-            tree.root.consolidate_ops()
-            tree.root.consolidate_children()
-            tree.root.calculate_expected(all_docIDs)
-            result_IDs = [str(result_ID) for result_ID in tree.root.recursive_merge(all_docIDs)]
-            result_IDs.append("\n")
-            output.write(" ".join(result_IDs))
+            rpn_stack = shunting_yard(query)
+            if rpn_stack:
+                tree = OpTree(rpn_stack, postings, dictionary)
+                tree.root.consolidate_ops()
+                tree.root.consolidate_children()
+                tree.root.calculate_expected(all_docIDs)
+                result_IDs = [str(result_ID) for result_ID in tree.root.recursive_merge(all_docIDs)]
+                result_IDs.append("\n")
+                output.write(" ".join(result_IDs))
+            else:
+                output.write("\n")
     postings.close()
     output.close()
 
