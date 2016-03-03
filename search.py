@@ -160,7 +160,7 @@ class OpNode:
             postings_file.seek(term_pointer)
             self.postings = [int(docID) for docID in postings_file.read(postings_length).split()]
 
-    def merge(self, children_postings):
+    def merge(self, children_postings, all_docIDs):
         if self.op == "NOT":
             return op_not(children_postings[0], all_docIDs)
         elif self.op == "OR":
@@ -168,10 +168,10 @@ class OpNode:
         elif self.op == "AND":
             return op_and(children_postings[0], children_postings[1])
 
-    def recursive_merge(self):
+    def recursive_merge(self, all_docIDs):
         if self.op != None:
-            children_postings = [child.recursive_merge() for child in self.children]
-            return self.merge(children_postings)
+            children_postings = [child.recursive_merge(all_docIDs) for child in self.children]
+            return self.merge(children_postings, all_docIDs)
         else:
             return self.postings
 
@@ -243,7 +243,36 @@ class OpTree:
         self.root = node_stack.pop()
 # Dat end tho
 
-if __name__ == "__main__":
+def tree_initialization_test():
+    tree = OpTree(['bill', 'gates', 'AND', 'steve', 'jobs', 'AND', 'AND'], None, None)
+    print "--- How tree looks like ---"
+    root = tree.root
+    print root.children[0].children[0].term,
+    print root.children[0].op,
+    print root.children[0].children[1].term,
+    print root.op,
+    print root.children[1].children[0].term,
+    print root.children[1].op,
+    print root.children[1].children[1].term
+
+def nots_test():
+    yes = OpNode(None, None, "Hi!")
+    no = OpNode([yes], "NOT", None)
+    yes1 = OpNode([no], "NOT", None)
+    no1 = OpNode([yes1], "NOT", None)
+    yes2 = OpNode([no1], "NOT", None)
+    no2 = OpNode([yes2], "NOT", None)
+    no2.consolidate_ops()
+    print no2.children[0].term
+
+def consolidate_test():
+    tree = OpTree(['bill', 'gates', 'AND', 'steve', 'jobs', 'AND', 'AND'], None, None)
+    tree.root.consolidate_ops()
+    print len(tree.root.children)
+    for child in tree.root.children:
+        print child.term
+
+def load_args():
     dictionary_file = postings_file = queries_file = output_file = None
 
     try:
@@ -265,32 +294,9 @@ if __name__ == "__main__":
     if dictionary_file == None or postings_file == None or queries_file == None or output_file == None:
         usage()
         sys.exit(2)
+    return (dictionary_file, postings_file, queries_file, output_file)
 
-    '''
-    # tree initialization
-    tree = OpTree(['bill', 'gates', 'AND', 'steve', 'jobs', 'AND', 'AND'], None, None)
-    print "--- How tree looks like ---"
-    root = tree.root
-    print root.children[0].children[0].term,
-    print root.children[0].op,
-    print root.children[0].children[1].term,
-    print root.op,
-    print root.children[1].children[0].term,
-    print root.children[1].op,
-    print root.children[1].children[1].term
-    '''
-
-    # nots
-    yes = OpNode(None, None, "Hi!")
-    no = OpNode([yes], "NOT", None)
-    yes1 = OpNode([no], "NOT", None)
-    no1 = OpNode([yes1], "NOT", None)
-    yes2 = OpNode([no1], "NOT", None)
-    no2 = OpNode([yes2], "NOT", None)
-    no2.consolidate_ops()
-    print no2.children[0].term
-
-    '''
+def process_queries(dictionary_file, postings_file, queries_file, output_file):
     # load dictionary
     with open(dictionary_file) as dict_file:
         all_docIDs, dictionary = json.load(dict_file)
@@ -303,17 +309,19 @@ if __name__ == "__main__":
             tree = OpTree(shunting_yard(query), postings, dictionary)
             tree.root.consolidate_ops()
             tree.root.calculate_expected()
-            result_IDs = [str(result_ID) for result_ID in tree.root.recursive_merge()]
+            result_IDs = [str(result_ID) for result_ID in tree.root.recursive_merge(all_docIDs)]
             result_IDs.append("\n")
             output.write(" ".join(result_IDs))
     postings.close()
     output.close()
-    '''
 
-    '''
-    tree = OpTree(['bill', 'gates', 'AND', 'steve', 'jobs', 'AND', 'AND'], None, None)
-    tree.root.consolidate_ops()
-    print len(tree.root.children)
-    for child in tree.root.children:
-        print child.term
-    '''
+def main():
+    dictionary_file, postings_file, queries_file, output_file = load_args()
+
+    # tree_initialization_test()
+    # nots_test()
+    # consolidate_test()
+    process_queries(dictionary_file, postings_file, queries_file, output_file)
+
+if __name__ == "__main__":
+    main()
