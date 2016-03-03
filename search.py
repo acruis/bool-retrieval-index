@@ -5,6 +5,7 @@ import getopt
 import json
 import heapq
 import time
+import math
 
 # For shunting_yard's use only
 def precedence(op):
@@ -43,12 +44,27 @@ def shunting_yard(query):
 
     return rpn_stack
 
+def get_skip_flags(len1, len2):
+    skip1 = int(math.sqrt(len1))
+    skip2 = int(math.sqrt(len2))
+    flags1 = [False] * len1
+    flags2 = [False] * len2
+    a = 0
+    b = 0
+    while a < len1:
+        flags1[a] = True
+        a += skip1
+    while b < len2:
+        flags2[b] = True
+        b += skip2
+    return (skip1, skip2, flags1, flags2)
 
 # Returns list result of p1 AND p2
 def op_and(p1, p2):
     result = []
     i = 0
     j = 0
+    skip_dist1, skip_dist2, can_skip1, can_skip2 = get_skip_flags(len(p1), len(p2))
 
     while i < len(p1) and j < len(p2):
         if p1[i] == p2[j]:
@@ -56,10 +72,24 @@ def op_and(p1, p2):
             i += 1
             j += 1
         elif p1[i] < p2[j]:
-            i += 1
+            if can_skip1[i]:
+                lookahead = i + skip_dist1
+                if lookahead < len(p1) and p1[lookahead] <= p2[j]:
+                    i += skip_dist1
+                else:
+                    i += 1
+            else:
+                i += 1
         else:
-            j += 1
-
+            if can_skip2[j]:
+                lookahead = j + skip_dist2
+                if lookahead < len(p2) and p2[lookahead] <= p1[i]:
+                    j += skip_dist2
+                else:
+                    j += 1
+            else:
+                j += 1
+                
     return result
 
 
@@ -79,6 +109,7 @@ def op_and_not(p1, p2):
     result = []
     i = 0
     j = 0
+    skip_dist1, skip_dist2, can_skip1, can_skip2 = get_skip_flags(len(p1), len(p2))
 
     while i < len(p1) and j < len(p2):
         if p1[i] == p2[j]:
@@ -88,7 +119,14 @@ def op_and_not(p1, p2):
             result.append(p1[i])
             i += 1
         else:
-            j += 1
+            if can_skip2[j]:
+                lookahead = j + skip_dist2
+                if lookahead < len(p2) and p2[lookahead] <= p1[i]:
+                    j += skip_dist2
+                else:
+                    j += 1
+            else:
+                j += 1
 
     result.extend(p1[i:])
 
@@ -157,12 +195,9 @@ def op_not(p, all_p):
 
     return result
 
-
 def usage():
     print "usage: " + sys.argv[0] + " -d dictionary-file -p postings-file -q file-of-queries -o output-file-of-results"
 
-
-# Here be Dats!
 class OpNode:
     """Nodes for tree used to model a search query in Reverse Polish Notation.
 
@@ -446,6 +481,16 @@ def and_not_test():
     tree.root.consolidate_children()
     print tree.root.op
 
+def random_skips_test():
+    even = [guy for guy in range(5000000) if guy % 2 == 0]
+    # odd = [guy for guy in range(5000000) if guy % 1000 == 0]
+    odd = [5000001]
+
+    begin = time.time() * 1000.0
+    _ = op_and(even, odd)
+    after = time.time() * 1000.0
+    print after-begin
+
 def main():
     dictionary_file, postings_file, queries_file, output_file = load_args()
 
@@ -453,6 +498,7 @@ def main():
     # nots_test()
     # consolidate_test()
     # and_not_test()
+    # random_skips_test()
     process_queries(dictionary_file, postings_file, queries_file, output_file)
 
 if __name__ == "__main__":
