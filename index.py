@@ -17,6 +17,7 @@ Pointer to "retrieval": 			dictionary[1]["retrieval"][0]
 Length of postings for "retrieval": dictionary[1]["retrieval"][1]
 """
 
+import re
 import getopt
 import sys
 import nltk

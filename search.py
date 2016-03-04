@@ -7,6 +7,7 @@ import heapq
 import time
 import math
 
+show_time = False
 
 class OpNode:
     """Nodes for tree used to model a search query in Reverse Polish Notation.
@@ -15,11 +16,12 @@ class OpNode:
 
     Attributes:
         children: A list of OpNode instances. Only operator nodes have children.
-        op: A string indicating the node's operator type..
+        op: A string indicating the node's operator type.
             Possible values: "NOT", "AND", "OR", "AND NOT", None
         term: A string containing the search token value.
         postings: An integer list storing the docIDs from the postings list of a search token node.
-        expected_count: An integer storing the expected number of docIDs after an operator node has been fully resolved.
+        expected_count: An integer storing the expected number of docIDs after optimizations have been carried out on the tree,
+                        based on the expected_count of child nodes.
     """
 
     children = None
@@ -96,7 +98,8 @@ class OpNode:
             return op_and_not(children_postings[0], children_postings[1])
 
     def consolidate_ops(self):
-        """Flattens tree structure of operator nodes in children depending on node operator type.
+        """Flattens tree structure of operator nodes in children depending on node operator type. The tree might lose itsno longer
+        be a binary tree 
 
         AND/OR is transitive, thus children of consecutive AND/OR nodes are recursively consolidated as self's children.
         Consecutive NOT nodes are merged, where a parent NOT and its child NOT nodes are replaced by its grandchild.
@@ -157,10 +160,11 @@ class OpNode:
 
         Converts (NOT p1 AND/OR NOT p2 AND/OR ... AND/OR NOT pN)into NOT (p1 OR/AND p2 OR/AND ... OR/AND pN).
         Self should be an AND/OR node, and its children are NOT nodes.
-        New child will be a single NOT node, and new grandchildren will be OR/AND nodes.
+        Produces a single NOT node with a child OR/AND node. This node will be set to self if self has no non-NOT children,
+        or added as a child to self otherwise.
 
         :param children_nots: A list of NOT operator nodes.
-        :return: A new NOT child node, with OR/AND grandchildren nodes where self is an AND/OR node.
+        :return: A new NOT node, with a child OR/AND node of non-NOT children of self, where self is an AND/OR node.
         """
         children_of_nots = [child_not.children[0] for child_not in children_nots]
         center_grandchild = OpNode(children_of_nots, "OR" if self.op == "AND" else "AND", None)
@@ -168,10 +172,10 @@ class OpNode:
         return new_child_not
 
     def process_and_not(self, child_not, children_notnots):
-        """Morph self into an AND NODE node.
+        """Morph self into an AND NOT node.
 
-        new_child_and is a new AND node that contains the not NOT children node of self.
-        child_not child node is set as the direct child node of self.
+        new_child_and is a new AND node that contains the non-NOT children node of self.
+        child_not's child node is set as the direct child node of self.
 
         :param child_not: A child NOT node object,
         :param children_notnots: A list of child nodes which are not NOT nodes.
@@ -237,7 +241,8 @@ class OpTree:
     op_list = ["NOT", "AND", "OR"]
 
     def __init__(self, rpn_stack, postings_file, dictionary):
-        """Constructs the OpTree as a binary tree. Loads postings into search-token OpNodes immediately.
+        """Constructs the OpTree as a binary tree.
+        Loads postings into search-token OpNodes immediately.
         """
         node_stack = []
         for token in rpn_stack:
@@ -258,10 +263,22 @@ class OpTree:
 
 '''
 Removing/Normalizing numbers
-    - Set all numbers to 0
-        Before normalizing numbers:
-            dict: 
-            postings: 
+    Before normalizing numbers:
+        dict: 926KB
+        postings: 3.1MB
+    After removing numbers:
+        dict: 907KB
+        postings: 3.0MB
+    After replacing numbers with 0:
+        dict: 908KB
+        postings: 3.1MB
+    After replacing tokens with numbers with 0:
+        dict: 570KB
+        postings: 3.1MB
+    After removing tokens with numbers:
+        dict: 570KB
+        postings: 2.8MB
+
 Remove stop words (observe change in dict/postings)
     Before removing stop words:
         dict: 926KB
@@ -537,17 +554,12 @@ def process_queries(dictionary_file, postings_file, queries_file, output_file):
     postings.close()
     output.close()
     after = time.time() * 1000.0
-    print after-begin
+    if show_time: print after-begin
 
 
 def main():
     dictionary_file, postings_file, queries_file, output_file = load_args()
 
-    # tree_initialization_test()
-    # nots_test()
-    # consolidate_test()
-    # and_not_test()
-    # random_skips_test()
     process_queries(dictionary_file, postings_file, queries_file, output_file)
 
 if __name__ == "__main__":
