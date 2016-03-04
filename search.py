@@ -237,6 +237,8 @@ class OpTree:
     op_list = ["NOT", "AND", "OR"]
 
     def __init__(self, rpn_stack, postings_file, dictionary):
+        """Constructs the OpTree as a binary tree. Loads postings into search-token OpNodes immediately.
+        """
         node_stack = []
         for token in rpn_stack:
             if token in self.op_list:
@@ -253,6 +255,18 @@ class OpTree:
                 token_node.read_postings_of_term(postings_file, dictionary)
                 node_stack.append(token_node)
         self.root = node_stack.pop()
+
+
+'''
+Removing/Normalizing numbers
+Remove stop words (observe change in dict/postings)
+    Before removing stop words:
+        dict: 926KB
+        postings: 3.1MB
+    After removing stop words:
+        dict: 911KB
+        postings: 2.2MB
+'''
 
 
 def precedence(op):
@@ -451,6 +465,7 @@ def op_not(p, all_p):
     return result
 
 def usage():
+    """Prints the proper format for calling this script."""
     print "usage: " + sys.argv[0] + " -d dictionary-file -p postings-file -q file-of-queries -o output-file-of-results"
 
 
@@ -490,8 +505,10 @@ def consolidate_test():
 
 # END TESTS #
 
-
 def load_args():
+    """Attempts to parse command line arguments fed into the script when it was called.
+    Notifies the user of the correct format if parsing failed.
+    """
     dictionary_file = postings_file = queries_file = output_file = None
 
     try:
