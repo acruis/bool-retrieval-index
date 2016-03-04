@@ -428,6 +428,8 @@ class OpTree:
     op_list = ["NOT", "AND", "OR"]
 
     def __init__(self, rpn_stack, postings_file, dictionary):
+        """Constructs the OpTree as a binary tree. Loads postings into search-token OpNodes immediately.
+        """
         node_stack = []
         for token in rpn_stack:
             if token in self.op_list:

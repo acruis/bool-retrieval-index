@@ -1,4 +1,4 @@
-'''
+"""
 Dictionary format:
 [
 	[1, 2, 3, 4, 5, 11],
@@ -15,7 +15,7 @@ Dictionary format:
 All docIDs in a list: 				dictionary[0]
 Pointer to "retrieval": 			dictionary[1]["retrieval"][0]
 Length of postings for "retrieval": dictionary[1]["retrieval"][1]
-'''
+"""
 
 import getopt
 import sys
@@ -29,6 +29,15 @@ except:
 	import pickle
 
 def load_all_doc_names(docs_dir):
+	"""Takes in the document directory path, and lists names of all non-directory
+	files from the given path. Returns a list of tuples (file_name, file_path) where
+	file_name is the integer conversion of the file name, and the file_path is used
+	to actually load the documents for indexing later. The list is sorted by file_name
+	(as integers)
+
+	:param docs_dir: The document directory path as a string
+	:return: A list of (docID, file_path) tuples, sorted by docID as integers
+	"""
 	sorted_members = sorted([int(dir_member) for dir_member in listdir(docs_dir)])
 	# Additional check for only files in directory
 	joined_members = [(dir_member, join(docs_dir, str(dir_member))) for dir_member in sorted_members]
@@ -36,6 +45,11 @@ def load_all_doc_names(docs_dir):
 	return joined_files
 
 def index_doc(doc_name, postings_list):
+	"""Indexes a single document in the corpus. Makes use of stemming and tokenization.
+
+	:param doc_name: A tuple containing the docID (to be stored as a posting) and doc_path which is the filepath to the document.
+	:param postings_list: The postings list, to be updated (mutated) as part of the indexing process.
+	"""
 	docID, doc_path = doc_name
 	doc_file = file(doc_path)
 	doc = doc_file.read()
