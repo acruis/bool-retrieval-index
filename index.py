@@ -54,7 +54,8 @@ def index_doc(doc_name, postings_list):
 
 def index_all_docs(docs):
 	postings_list = {}
-	for doc in docs: # slice for smaller postings file
+	for doc in docs[:100]: # slice for smaller postings file
+		print doc
 		index_doc(doc, postings_list)
 	return postings_list
 
@@ -106,7 +107,7 @@ def parse_args():
 def main():
 	docs_dir, dict_file, postings_file = parse_args()
 
-	print "Searching all documents in {}...".format(docs_dir),
+	print "Searching all documents in {0}...".format(docs_dir),
 	sys.stdout.flush()
 	docs = load_all_doc_names(docs_dir)
 	print "DONE"
@@ -116,15 +117,15 @@ def main():
 	postings_list = index_all_docs(docs)
 	print "DONE"
 
-	print "Writing postings to {}...".format(postings_file),
+	print "Writing postings to {0}...".format(postings_file),
 	sys.stdout.flush()
 	dict_terms = write_postings(postings_list, postings_file)
 	print "DONE"
 
-	print "Writing dictionary to {}...".format(dict_file),
+	print "Writing dictionary to {0}...".format(dict_file),
 	sys.stdout.flush()
 	docIDs = all_doc_IDs(docs)
-	create_dictionary(docIDs, dict_terms, dict_file)
+	create_dictionary(docIDs[:100], dict_terms, dict_file)
 	print "DONE"
 
 if __name__ == "__main__":
