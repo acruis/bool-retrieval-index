@@ -10,6 +10,12 @@ import math
 '''
 Removing/Normalizing numbers
 Remove stop words (observe change in dict/postings)
+    Before removing stop words:
+        dict: 926KB
+        postings: 3.1MB
+    After removing stop words:
+        dict: 911KB
+        postings: 2.2MB
 '''
 
 def precedence(op):

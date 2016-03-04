@@ -75,7 +75,6 @@ def index_all_docs(docs):
 	"""
 	postings_list = {}
 	for doc in docs:
-		print doc
 		index_doc(doc, postings_list)
 	return postings_list
 
