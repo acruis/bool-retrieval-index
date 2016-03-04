@@ -316,7 +316,18 @@ def shunting_yard(query):
 
     return rpn_stack
 
+
 def get_skip_flags(len1, len2):
+    """Given lengths of the first and second postings lists, return respective skip distances and boolean skip flags list .
+
+    :param len1: Int length of first postings list
+    :param len2: Int length of second postings list
+    :return:
+        skip1: Int, skip distance for first postings list.
+        skip2: Int, skip distance for second postings list.
+        flags1: Boolean list, determines whether skipping is allowed at a certain index of the first postings list.
+        flags2: Boolean list, determines whether skipping is allowed at a certain index of the second postings list.
+    """
     skip1 = int(math.sqrt(len1))
     skip2 = int(math.sqrt(len2))
     flags1 = [False] * len1
@@ -330,6 +341,7 @@ def get_skip_flags(len1, len2):
         flags2[b] = True
         b += skip2
     return (skip1, skip2, flags1, flags2)
+
 
 def op_and(p1, p2):
     """Evaluates p1 AND p2 and returns result as list.
@@ -464,46 +476,11 @@ def op_not(p, all_p):
 
     return result
 
+
 def usage():
     """Prints the proper format for calling this script."""
     print "usage: " + sys.argv[0] + " -d dictionary-file -p postings-file -q file-of-queries -o output-file-of-results"
 
-
-# TESTS #
-
-
-def tree_initialization_test():
-    tree = OpTree(['bill', 'gates', 'AND', 'steve', 'jobs', 'AND', 'AND'], None, None)
-    print "--- How tree looks like ---"
-    root = tree.root
-    print root.children[0].children[0].term,
-    print root.children[0].op,
-    print root.children[0].children[1].term,
-    print root.op,
-    print root.children[1].children[0].term,
-    print root.children[1].op,
-    print root.children[1].children[1].term
-
-def nots_test():
-    yes = OpNode(None, None, "Hi!")
-    no = OpNode([yes], "NOT", None)
-    yes1 = OpNode([no], "NOT", None)
-    no1 = OpNode([yes1], "NOT", None)
-    yes2 = OpNode([no1], "NOT", None)
-    no2 = OpNode([yes2], "NOT", None)
-    yes3 = OpNode([no2], "NOT", None)
-    yes3.consolidate_ops()
-    print yes3.term
-
-def consolidate_test():
-    tree = OpTree(['bill', 'gates', 'AND', 'steve', 'jobs', 'AND', 'AND'], None, None)
-    tree.root.consolidate_ops()
-    print len(tree.root.children)
-    for child in tree.root.children:
-        print child.term
-
-
-# END TESTS #
 
 def load_args():
     """Attempts to parse command line arguments fed into the script when it was called.
@@ -532,6 +509,7 @@ def load_args():
         sys.exit(2)
     return (dictionary_file, postings_file, queries_file, output_file)
 
+
 def process_queries(dictionary_file, postings_file, queries_file, output_file):
     # load dictionary
     begin = time.time() * 1000.0
@@ -559,23 +537,6 @@ def process_queries(dictionary_file, postings_file, queries_file, output_file):
     after = time.time() * 1000.0
     print after-begin
 
-def and_not_test():
-    tree = OpTree(shunting_yard("money AND NOT possibility"), None, {})
-    print (tree.root.children[0].op, tree.root.children[0].term)
-    print (tree.root.children[1].op, tree.root.children[1].term)
-    print (tree.root.children[1].children[0].op, tree.root.children[1].children[0].term)
-    tree.root.consolidate_children()
-    print tree.root.op
-
-def random_skips_test():
-    even = [guy for guy in range(5000000) if guy % 2 == 0]
-    # odd = [guy for guy in range(5000000) if guy % 1000 == 0]
-    odd = [5000001]
-
-    begin = time.time() * 1000.0
-    _ = op_and(even, odd)
-    after = time.time() * 1000.0
-    print after-begin
 
 def main():
     dictionary_file, postings_file, queries_file, output_file = load_args()
