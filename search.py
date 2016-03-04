@@ -261,33 +261,6 @@ class OpTree:
                 node_stack.append(token_node)
         self.root = node_stack.pop()
 
-'''
-Removing/Normalizing numbers
-    Before normalizing numbers:
-        dict: 926KB
-        postings: 3.1MB
-    After removing numbers:
-        dict: 907KB
-        postings: 3.0MB
-    After replacing numbers with 0:
-        dict: 908KB
-        postings: 3.1MB
-    After replacing tokens with numbers with 0:
-        dict: 570KB
-        postings: 3.1MB
-    After removing tokens with numbers:
-        dict: 570KB
-        postings: 2.8MB
-
-Remove stop words (observe change in dict/postings)
-    Before removing stop words:
-        dict: 926KB
-        postings: 3.1MB
-    After removing stop words:
-        dict: 911KB
-        postings: 2.2MB
-'''
-
 def precedence(op):
     """Given operator type, returns the precedence order of operator.
 
