@@ -67,13 +67,26 @@ def index_doc(doc_name, postings_list):
 	doc_file.close()
 
 def index_all_docs(docs):
+	"""Calls index_doc on all documents in their order in the list passed as argument. Maintaining this order is important as this
+	results in sorted postings without having to manually sort the postings for each term at the end of the indexing step.
+
+	:param docs: The list of tuples containing the docID and file path to all documents, sorted by docID
+	:return: The inverted index constructed from the given documents
+	"""
 	postings_list = {}
-	for doc in docs[:100]: # slice for smaller postings file
+	for doc in docs:
 		print doc
 		index_doc(doc, postings_list)
 	return postings_list
 
 def write_postings(postings_list, postings_file_name):
+	"""Given an inverted index, write each term onto disk, while keeping track of the pointer to the start of postings for each term,
+	together with the run length of said postings on the file, which will be used to construct the dictionary.
+
+	:param postings_list: The inverted index to be stored
+	:param postings_file_name: The name of the postings file
+	:return: A dictionary object with term as key and a tuple of (postings pointer, postings run length in the file) as value
+	"""
 	postings_file = file(postings_file_name, 'w')
 	dict_terms = {}
 	for term, docIDs in postings_list.iteritems():
@@ -86,18 +99,34 @@ def write_postings(postings_list, postings_file_name):
 	return dict_terms
 
 def all_doc_IDs(docs):
+	"""Extracts docIDs from a list of tuples of docID and path to the document file.
+
+	:param docs: A list of tuples of (docID, path to document file) sorted by docID as integers
+	:return: The list of docIDs, still sorted as integers
+	"""
 	# O(doc_count).
 	return [docID for docID, doc_path in docs]
 
 def create_dictionary(docIDs, dict_terms, dict_file_name):
+	"""Combines the list of all document IDs (necessary for computing NOT), and the dictionary itself, to create the dictionary file,
+	and then writes the resulting list to the specified file path as a JSON data structure.
+
+	:param docIDs: The list of all document IDs, sorted
+	:param dict_terms: The dictionary, with term as key and tuple of (postings pointer, postings run length in the file) as value
+	:dict_file_name: The file path of the resultant dictionary file
+	"""
 	dict_file = file(dict_file_name, 'w')
 	json.dump([docIDs, dict_terms], dict_file)
 	dict_file.close()
 
 def usage():
+	"""Prints the proper format for calling this script."""
 	print "usage: " + sys.argv[0] + " -i directory-of-documents -d dictionary-file -p postings-file"
 
 def parse_args():
+	"""Attempts to parse command line arguments fed into the script when it was called.
+	Notifies the user of the correct format if parsing failed.
+	"""
 	docs_dir = dict_file = postings_file = None
 	try:
 	    opts, args = getopt.getopt(sys.argv[1:], 'i:d:p:')
@@ -119,6 +148,9 @@ def parse_args():
 	return (docs_dir, dict_file, postings_file)
 
 def main():
+	"""Constructs the inverted index from all documents in the specified file path, then writes dictionary to the specified dictionary
+	file in the command line arguments, and postings to the specified postings file.
+	"""
 	docs_dir, dict_file, postings_file = parse_args()
 
 	print "Searching all documents in {0}...".format(docs_dir),
@@ -139,7 +171,7 @@ def main():
 	print "Writing dictionary to {0}...".format(dict_file),
 	sys.stdout.flush()
 	docIDs = all_doc_IDs(docs)
-	create_dictionary(docIDs[:100], dict_terms, dict_file)
+	create_dictionary(docIDs, dict_terms, dict_file)
 	print "DONE"
 
 if __name__ == "__main__":
